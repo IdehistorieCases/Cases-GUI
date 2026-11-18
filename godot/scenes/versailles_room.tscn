@@ -11,8 +11,6 @@
 [ext_resource type="Texture2D" uid="uid://ogmgmat75r3o" path="res://assets/versailles/optimized/polyhaven/dark_paneled_wood/textures/dark_paneled_wood_arm_1k.jpg" id="9_wall_arm"]
 [ext_resource type="Script" uid="uid://cuccixl7ilpqs" path="res://scripts/negotiation_seating.gd" id="10_seating"]
 [ext_resource type="Script" uid="uid://cd7g4a5yhfjky" path="res://scripts/versailles_room_decor.gd" id="11_opq11"]
-[ext_resource type="PackedScene" path="res://assets/characters/cases_suited_negotiator.glb" id="12_negotiator"]
-[ext_resource type="Script" path="res://scripts/versailles_room_participant.gd" id="13_participant"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_osat4"]
 albedo_texture = ExtResource("1_57bx7")
@@ -669,14 +667,6 @@ light_energy = 0.32
 omni_range = 7.5
 omni_attenuation = 1.6
 
-[node name="Participants" type="Node3D" parent="."]
-
-[node name="NegotiatorSeat_01" type="Node3D" parent="Participants"]
-transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -1.62, 0, 0)
-script = ExtResource("13_participant")
-
-[node name="CasesSuitedNegotiator" parent="Participants/NegotiatorSeat_01" instance=ExtResource("12_negotiator")]
-
 [node name="Anchors" type="Node3D" parent="." unique_id=1847559052]
 
 [node name="ParticipantSeatAnchor_Template" type="Marker3D" parent="Anchors" unique_id=1192662350]
@@ -693,3 +683,8 @@ environment = SubResource("Environment_4nkyk")
 
 [node name="RoomDecorations" type="Node3D" parent="." unique_id=1469918709]
 script = ExtResource("11_opq11")
+
+[node name="Participants" type="Node3D" parent="." unique_id=1061775823]
+
+[node name="NegotiatorSeat_01" type="Node3D" parent="Participants" unique_id=144117953]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -1.62, 0, 0)
