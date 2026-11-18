@@ -10,6 +10,12 @@ Garments are generated in Blender from reusable meter-scale parameters in `PRESE
 
 Blender produces an editable `.blend`, a Godot-ready skinned GLB, eight 1200×1200 preview renders, and six talking-animation frame samples. The build script combines the requested views into contact sheets, preserves a same-camera before/after talking comparison, runs Godot import, animation, skin-binding, and proportion checks, and captures a Compatibility-renderer frame with Godot Movie Maker.
 
+Persona data lives in the Blender-independent [persona_presets.py](art_source/scripts/persona_presets.py) module. The `senior_mediator`, `younger_envoy`, and `scholarly_delegate` presets reuse the same Quaternius 65-bone skeleton and `SeatedIdle` / `SeatedTalking` clips while varying face shape, build, hair, facial hair, palette, and suit construction. They are original period archetypes, not portraits of specific historical people; the Godot demo remains a single character and does not add gameplay roster behavior.
+
+Every persona profile is validated before the generator edits the Blender scene or creates output directories. Validation checks finite, bounded dimensions, known hairstyle and facial-hair values, known suit styles, and RGB triples with channels in `[0, 1]`. Garment-fit offsets are explicit meter-scale parameters: the shared profile sets 4 mm body clearance, 28 mm jacket-armhole overlap, 12 mm cuff overlap, 4 mm waistcoat clearance, 2 mm shirt clearance, 4 mm trouser clearance, and 6 mm shoe-to-foot overlap. Jacket and sleeve geometry uses the same values while retaining the established bone-aligned skinning.
+
+Face shape is applied through one `transform_face_point()` mapping shared by the head surface and attached hair, eye, brow, pupil, and facial-hair landmarks. The senior mediator uses two overlapping, skinned jacket fronts with two columns of buttons for a double-breasted construction.
+
 ## Open the demo
 
 Project directory: `D:\projects\Cases-GUI\godot`
@@ -41,6 +47,18 @@ To open the demo directly in Godot after generation:
 ```
 
 The main previews and talking samples are under `art_source/output/v2/`. The original V2 baseline is preserved under `art_source/output/v2/before/`, and the state before this refinement pass is under `art_source/output/v2/pre_refinement/`. Previous and current validation notes are in [docs/TEST_RESULTS.md](docs/TEST_RESULTS.md).
+
+### Build the three additional personas only
+
+Run this separate path from the repository root:
+
+```powershell
+.\build_variants.ps1
+```
+
+It creates each named variant GLB under `godot/assets/characters/` and its editable `.blend` plus 1200×1200 preview set under `art_source/output/v3/<persona>/`. It imports and validates copies in a temporary Godot project, captures the four-character engine lineup, and produces labeled Blender and Blender/Godot comparison sheets. It does not invoke the legacy default build or write to the default `.blend`, default GLB, or V2 renders. `art_source/output/v3/legacy_sha256.txt` records before/after SHA-256 hashes for the vendored source, default `.blend`, and default GLB. Set `BLENDER_EXE` / `GODOT_EXE` or pass `-BlenderPath` / `-GodotPath` to choose executables.
+
+The generated comparison sheets are reviewed in [docs/TEST_RESULTS.md](docs/TEST_RESULTS.md). Remaining visual limitations are recorded there rather than treating import success as a visual-quality pass.
 
 ## V2 visual review
 
