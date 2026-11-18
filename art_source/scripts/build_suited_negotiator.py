@@ -40,13 +40,15 @@ PRESET = {
         "shoulder_half_width": 0.180,
         "depth_scale": 0.92,
         "front_opening_angle": 0.42,
-        "collar_half_width": 0.076,
-        "collar_depth": 0.052,
+        "collar_half_width": 0.067,
+        "collar_depth": 0.048,
         "sleeve_shoulder_radius": 0.045,
         "sleeve_elbow_radius": 0.036,
         "sleeve_forearm_radius": 0.032,
         "sleeve_wrist_radius": 0.024,
-        "sleeve_root_inset": 0.050,
+        # Recess the closed sleeve root inside the jacket shell, then blend it
+        # outward across several rings to form an overlapping armhole.
+        "sleeve_root_inset": 0.115,
         "sleeve_root_ratio": 0.50,
         "sleeve_length": 0.92,
         "lapel_width_scale": 0.90,
@@ -343,6 +345,39 @@ def surface_mesh(name, profile, angles, material, wrap=False, thickness=0.0):
 opening = JACKET["front_opening_angle"]
 jacket_angles = [opening + i * (2.0 * math.pi - 2.0 * opening) / 32.0 for i in range(33)]
 coat = surface_mesh("03 · Tailored midnight jacket", JACKET_PROFILE, jacket_angles, jacket_material, thickness=0.003)
+
+
+def make_jacket_neck_yoke():
+    """Close the rear neckline between the jacket shell and shirt collar."""
+    sections = [(1.492, 0.064, 0.051), (1.505, 0.060, 0.048), (1.515, 0.056, 0.045)]
+    angular_count = 24
+    radial_steps = 4
+    vertices = []
+    weights = []
+    faces = []
+    for z, inner_x, inner_y in sections:
+        outer_x, outer_y, center_y = profile_at(JACKET_PROFILE, z)
+        inner_x += 0.003
+        inner_y += 0.003
+        for angular_index in range(angular_count + 1):
+            angle = opening + angular_index * (2.0 * math.pi - 2.0 * opening) / angular_count
+            for radial_index in range(radial_steps + 1):
+                across = radial_index / radial_steps
+                radius_x = inner_x * (1.0 - across) + outer_x * across
+                radius_y = inner_y * (1.0 - across) + outer_y * across
+                vertices.append((radius_x * math.sin(angle), center_y - radius_y * math.cos(angle), z))
+                weights.append(torso_weights(z))
+    row_width = (angular_count + 1) * (radial_steps + 1)
+    for row in range(len(sections) - 1):
+        for angle_index in range(angular_count):
+            for radial_index in range(radial_steps):
+                a = row * row_width + angle_index * (radial_steps + 1) + radial_index
+                b = a + radial_steps + 1
+                faces.append((a, a + 1, b + 1, b))
+    skinned("03 · Shaped rear jacket neckline", vertices, faces, weights, jacket_material, 0.002)
+
+
+make_jacket_neck_yoke()
 shirt_angles = [i * 2.0 * math.pi / 24.0 for i in range(24)]
 surface_mesh("02 · Dress shirt body", SHIRT_PROFILE, shirt_angles, shirt_material, wrap=True, thickness=0.002)
 
@@ -446,7 +481,6 @@ def ring_limb(name, centers, radii, bone_weights, material, depth_scale=0.84, up
 
 
 def arm_centerline(side, label):
-    clavicle = rig.data.bones[f"clavicle_{label}"]
     upper = rig.data.bones[f"upperarm_{label}"]
     lower = rig.data.bones[f"lowerarm_{label}"]
     # Run the open shoulder end under the jacket body, so the upper arm joins
@@ -458,8 +492,11 @@ def arm_centerline(side, label):
     sleeve_end = JACKET["sleeve_length"]
     if not 0.80 < sleeve_end < 0.98:
         raise ValueError("jacket.sleeve_length must end between 80% and 98% of the forearm")
+    root_inset = JACKET["sleeve_root_inset"]
     path_points = [
-        upper.head_local - upper_axis * JACKET["sleeve_root_inset"],
+        upper.head_local - upper_axis * root_inset,
+        upper.head_local - upper_axis * (root_inset * 0.66),
+        upper.head_local - upper_axis * (root_inset * 0.32),
         upper.head_local.copy(),
         upper.head_local.lerp(elbow, 0.14),
         upper.head_local.lerp(elbow, 0.40),
@@ -477,8 +514,10 @@ def arm_centerline(side, label):
     wrist_radius = JACKET["sleeve_wrist_radius"]
     radii = [
         shoulder_radius * JACKET["sleeve_root_ratio"],
-        shoulder_radius * 0.72,
+        shoulder_radius * 0.68,
         shoulder_radius * 0.84,
+        shoulder_radius * 0.92,
+        shoulder_radius,
         shoulder_radius,
         shoulder_radius * 0.96,
         elbow_radius * 1.05,
@@ -496,13 +535,13 @@ def arm_centerline(side, label):
         normalized_distance.append(traveled / total_length)
     weights = []
     for position in normalized_distance:
-        if position < 0.20:
-            clavicle_weight = 0.50 * (1.0 - smoothstep(position / 0.20))
+        if position < 0.25:
+            clavicle_weight = 0.68 * (1.0 - smoothstep(position / 0.25))
             weights.append({f"clavicle_{label}": clavicle_weight, f"upperarm_{label}": 1.0 - clavicle_weight})
-        elif position < 0.40:
+        elif position < 0.42:
             weights.append({f"upperarm_{label}": 1.0})
-        elif position < 0.66:
-            t = smoothstep((position - 0.40) / 0.26)
+        elif position < 0.67:
+            t = smoothstep((position - 0.42) / 0.25)
             weights.append({f"upperarm_{label}": 1.0 - t, f"lowerarm_{label}": t})
         elif position < 0.98:
             weights.append({f"lowerarm_{label}": 1.0})
@@ -516,8 +555,8 @@ def make_sleeve(side, label):
     jacket_points = points[:-1]
     jacket_radii = radii[:-1]
     jacket_weights = weights[:-1]
-    # Fade the shoulder root into the jacket yoke rather than pinching it to a
-    # tiny cap, and run the cuff into the last 8% of the forearm.
+    # Bury the open sleeve root in the jacket shell.  Staggered rings create a
+    # gradual armhole transition without enlarging the shoulder radius.
     ring_limb("Suit sleeve " + label, jacket_points, jacket_radii, jacket_weights, jacket_material,
               depth_scale=0.82, up_scale=0.88, thickness=0.002, close_start=True)
     make_cuff(label, lower_head, wrist)
@@ -867,26 +906,154 @@ def make_hair_and_face():
 
 make_hair_and_face()
 
-# Keep the original face and animated hands. The torso, arms and legs are
-# completely covered by the tailored garments, which remain independently
-# skinned to the same 65-bone armature.
+# Retain the head, neck and hands from the source's anatomical skin weights.
+# The old face-center clipping cut through arbitrary polygons and left pointed
+# neck and wrist scraps.  Weight masks respect the source rig and connected
+# components remove any small detached surfaces at those boundaries.
+body_mesh = body.data
+group_ids = {group.name: group.index for group in body.vertex_groups}
+required_groups = ("Head", "neck_01", "hand_l", "hand_r")
+missing_groups = [name for name in required_groups if name not in group_ids]
+if missing_groups:
+    raise ValueError(f"Source body is missing anatomical vertex groups: {missing_groups}")
+
+vertex_weights = []
+for vertex in body_mesh.vertices:
+    weights = {name: 0.0 for name in required_groups}
+    for assignment in vertex.groups:
+        for name in required_groups:
+            if assignment.group == group_ids[name]:
+                weights[name] = assignment.weight
+    vertex_weights.append(weights)
+
+def connected_face_components(mesh, candidates):
+    edge_faces = {}
+    for polygon in mesh.polygons:
+        vertices = polygon.vertices
+        for first, second in zip(vertices, vertices[1:] + vertices[:1]):
+            edge_faces.setdefault(tuple(sorted((first, second))), []).append(polygon.index)
+
+    adjacent = {index: set() for index in candidates}
+    for linked_faces in edge_faces.values():
+        selected = [index for index in linked_faces if index in candidates]
+        for index in selected:
+            adjacent[index].update(other for other in selected if other != index)
+
+    components = []
+    remaining = set(candidates)
+    while remaining:
+        stack = [remaining.pop()]
+        component = []
+        while stack:
+            current = stack.pop()
+            component.append(current)
+            neighbors = adjacent[current] & remaining
+            remaining.difference_update(neighbors)
+            stack.extend(neighbors)
+        components.append(component)
+    return components
+
+def selected_components(candidates, label, minimum_faces=12):
+    components = connected_face_components(body_mesh, candidates)
+    retained = [component for component in components if len(component) >= minimum_faces]
+    if label == "head":
+        # The source assigns Head influence to a small flared neck shell too.
+        # Keep the facial/head components but replace that jagged shell with a
+        # clean neck loft below.
+        clean_head = []
+        for component in retained:
+            z_values = [body_mesh.vertices[vertex].co.z
+                        for face_index in component
+                        for vertex in body_mesh.polygons[face_index].vertices]
+            if min(z_values) < 1.58 and max(z_values) < 1.64:
+                print("BODY REGION head: replacing flared source neck component", len(component))
+                continue
+            clean_head.append(component)
+        retained = clean_head
+    print("BODY REGION", label, "components", sorted((len(component) for component in components), reverse=True),
+          "retained", sum(map(len, retained)))
+    return {index for component in retained for index in component}
+
+head_candidates = set()
+hand_candidates = {"hand_l": set(), "hand_r": set()}
+hand_planes = {}
+for name in hand_candidates:
+    lower_bone = rig.data.bones[f"lowerarm_{name[-1]}"]
+    forearm_axis = (lower_bone.tail_local - lower_bone.head_local).normalized()
+    hand_planes[name] = (lower_bone.tail_local.copy(), forearm_axis)
+for polygon in body_mesh.polygons:
+    weights = [vertex_weights[index] for index in polygon.vertices]
+    head_weight = sum(row["Head"] for row in weights) / len(weights)
+    if head_weight >= 0.25:
+        head_candidates.add(polygon.index)
+    center = polygon.center
+    for name in hand_candidates:
+        wrist, forearm_axis = hand_planes[name]
+        source_hand_influence = max(row[name] for row in weights)
+        wrist_plane_distance = (center - wrist).dot(forearm_axis)
+        # Keep the hand and a short wrist overlap behind the fitted cuff.  The
+        # plane follows the forearm bone, while the vertex group identifies
+        # hand anatomy and mirrors correctly per side.
+        if wrist_plane_distance >= -0.026 and source_hand_influence > 0.001:
+            hand_candidates[name].add(polygon.index)
+
+keep_faces = selected_components(head_candidates, "head")
+for name, candidates in hand_candidates.items():
+    keep_faces |= selected_components(candidates, name, minimum_faces=50)
+
 bm = bmesh.new()
-bm.from_mesh(body.data)
-discard = []
-for face in bm.faces:
-    center = face.calc_center_median()
-    visible_head = (center.z > 1.565 and abs(center.x) < 0.16) or (center.z > 1.515 and abs(center.x) < 0.105)
-    visible_hands = abs(center.x) > 0.685 and center.z > 1.19
-    if not (visible_head or visible_hands):
-        discard.append(face)
+bm.from_mesh(body_mesh)
+bm.faces.ensure_lookup_table()
+bm.faces.index_update()
+discard = [face for face in bm.faces if face.index not in keep_faces]
 bmesh.ops.delete(bm, geom=discard, context="FACES")
 loose = [vertex for vertex in bm.verts if not vertex.link_faces]
 if loose:
     bmesh.ops.delete(bm, geom=loose, context="VERTS")
+degenerate = [face for face in bm.faces if face.calc_area() < 1e-10]
+if degenerate:
+    raise ValueError(f"Trimmed visible skin mesh contains {len(degenerate)} degenerate faces")
 bm.to_mesh(body.data)
 bm.free()
+if not body.data.polygons:
+    raise ValueError("Anatomical skin extraction removed all visible body faces")
 body.data.materials.clear()
 body.data.materials.append(skin_material)
+
+
+def make_neck():
+    """Bridge the source head to the shirt collar with a clean skinned neck."""
+    sections = [
+        (1.485, 0.042, 0.038, {"spine_03": 0.35, "neck_01": 0.65}),
+        (1.505, 0.043, 0.039, {"spine_03": 0.20, "neck_01": 0.80}),
+        (1.525, 0.044, 0.040, {"neck_01": 1.0}),
+        (1.545, 0.044, 0.039, {"neck_01": 0.85, "Head": 0.15}),
+        (1.565, 0.040, 0.037, {"neck_01": 0.55, "Head": 0.45}),
+        (1.585, 0.034, 0.033, {"neck_01": 0.20, "Head": 0.80}),
+        (1.600, 0.028, 0.027, {"Head": 1.0}),
+    ]
+    radial_count = 24
+    vertices = []
+    weights = []
+    faces = []
+    for z, radius_x, radius_y, bone_weights in sections:
+        for column in range(radial_count):
+            angle = 2.0 * math.pi * column / radial_count
+            vertices.append((radius_x * math.sin(angle), 0.038 - radius_y * math.cos(angle), z))
+            weights.append(bone_weights)
+    for row in range(len(sections) - 1):
+        for column in range(radial_count):
+            next_column = (column + 1) % radial_count
+            a = row * radial_count + column
+            b = (row + 1) * radial_count + column
+            faces.append((a, row * radial_count + next_column, (row + 1) * radial_count + next_column, b))
+    faces.append(tuple(reversed(range(radial_count))))
+    top = (len(sections) - 1) * radial_count
+    faces.append(tuple(top + column for column in range(radial_count)))
+    skinned("Anatomical neck transition", vertices, faces, weights, skin_material, 0.001)
+
+
+make_neck()
 
 
 def cube(name, location, size, material, bevel=0.012):

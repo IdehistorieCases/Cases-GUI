@@ -1,41 +1,42 @@
-# Suited Negotiator V2 - refinement validation
+# Suited Negotiator V2.1 geometry repair
 
-Recorded 18 November 2026 on Windows with Blender 4.2.2 and Godot 4.7.2 stable. Run from the `D:\projects\Cases-GUI` repository root with `.\build_and_validate.ps1`.
+Recorded 18 November 2026 on Windows with Blender 4.2.2 and Godot 4.7.2 stable. Run from the repository root with `.\build_and_validate.ps1`.
 
-## Refinement work
+## Geometry changes
 
-The Quaternius `SuperHero_Male` source and 65-bone skeleton remain in place. `PRESET` now drives the narrower shoulder and chest profile, a slimmer bone-aligned sleeve profile, fitted short cuffs, reduced shirt neckline, and waistcoat opening. Sleeves follow the shoulder, upper-arm, elbow, and forearm rest-pose joints; weights blend from clavicle to upper arm and across the elbow. The non-destructive corrective shape key now includes a modest neck width/depth correction.
+The Quaternius `SuperHero_Male` source and its 65-bone humanoid rig remain in use. The sleeve roots now extend 0.115 m under the jacket shell and widen across staged, bone-aligned rings. The cap is buried inside the torso, and shoulder weights blend from the clavicle into the upper arm before continuing across the elbow.
 
-The jacket opening and lapel panels were reshaped around the neck and chest, the waistcoat is a darker distinct layer, the shirt/tie colors are muted, and the tie has a smaller knot. Cuffs now have a 0.048 m outside diameter and 0.034 m length and remain weighted to the moving wrist. Trousers use narrower bone-following ring radii with less front-to-back depth; shoes have a broader toe and warm brown leather material. Eyes use a warm ivory material with brown irises and pupils; brows and a single close-set moustache use the hair material. The hair cap has a small asymmetric hairline variation rather than separate floating strand pieces.
+Body trimming no longer keeps polygons by broad face-center boxes. It identifies head geometry from the source `Head` vertex group, rejects the separate 230-face flared neck component, and retains the larger connected head surfaces. A tapered neck loft bridges the head and shirt collar with `neck_01`, `Head`, and `spine_03` weights. A shaped, skinned rear jacket yoke meets the collar and closes the open neckline edge.
 
-## Full build and Godot validation
+Hand extraction now uses a plane derived from each lower-arm rest-pose bone, retaining the hand plus a short wrist overlap inside the cuff. Connected components under 50 faces are discarded to remove detached wrist fragments. Original hand vertex groups and skinning remain intact.
 
-`build_and_validate.ps1` completed successfully after the final generator update. It refreshed the editable Blender file and Godot GLB, all eight preview renders, six talking samples, comparison sheets, and the Godot capture.
+## Build and Godot validation
 
-- Godot imported the expected 65-bone skeleton and both `SeatedIdle` and `SeatedTalking` clips.
-- **38 character and garment skinned meshes / 38 weighted surfaces** passed valid-bone and normalized-weight checks.
-- The validator sampled seven times in each clip, including both endpoints; both clips applied bone transforms and the character root stayed fixed.
-- Pelvis height at the comparison sample was **0.583530 m** in both clips.
-- Sleeve, cuff, trouser, and shoe dimension guards passed.
-- The Compatibility-renderer demo started without runtime errors.
-- A real Godot frame was captured through Movie Maker at **1152 x 648**. This resolves the earlier black GUI screenshot for the target-engine visual check.
+`build_and_validate.ps1` completed successfully after regenerating the Blender source, GLB, and previews.
 
-The complete build log is `art_source/output/v2/build_validation_transcript.txt`; the Godot capture log is `art_source/output/v2/godot_capture.log`.
+- Blender 4.2.2 generated the editable `.blend`, exported the GLB, and rendered the full V2 preview set.
+- Godot 4.7.2 imported a 65-bone skeleton with `SeatedIdle` and `SeatedTalking`.
+- **40 skinned meshes / 40 weighted surfaces** passed valid-bone and normalized-weight checks.
+- The validator sampled seven times in each animation. Both clips applied bone transforms and the character root remained fixed.
+- Pelvis height was **0.583530 m** in both seated states.
+- The Compatibility-renderer demo started without runtime errors and produced a nonblack **1152 x 648** Movie Maker frame at `art_source/output/v2/godot_engine_capture00000000.png`.
 
-## Visual review
+The full run transcript is `art_source/output/v2/build_validation_transcript.txt`; the Godot capture log is `art_source/output/v2/godot_capture.log`.
 
-Blender rendered eight 1200 x 1200 views and six talking frames at 1, 10, 22, 30, 45, and 60. Frames 22 and 30 show the arms crossing the chest. The full view set is `art_source/output/v2/`; the contact sheet is `comparison_contact_sheet.png`. A same-camera, same-frame comparison against the saved pre-refinement render is `before_after_talking_comparison.png`. The previous V2 baseline is preserved under `before/`, and the exact pre-refinement state for this pass is preserved under `pre_refinement/`.
+## Visual inspection
 
-![Before and after talking frame](../art_source/output/v2/before_after_talking_comparison.png)
+Blender regenerated front, three-quarter, and side idle views; front and three-quarter talking views; shoulder/cuff details; and talking frames 1, 10, 22, 30, 45, and 60. The shoulder, neckline, and wrist close-ups were reviewed alongside talking frames 22 and 30. The saved comparison uses the same cameras and animation frames for V2.0 and V2.1:
 
-![Final Godot Compatibility-renderer capture](../art_source/output/v2/godot_engine_capture00000000.png)
+![V2.0 and V2.1 shoulder, neckline, cuff, and hand comparisons](../art_source/output/v2/geometry_repair_comparison.png)
 
-The talking poses show a slimmer sleeve/cuff outline than the pre-refinement render, clearer waistcoat and lapel separation, darker eyes and hair, and brown dress shoes. Hands remain connected through the inspected poses.
+The committed representative previews include the current contact sheet, front idle/talking views, both sleeve details, frames 22 and 30, and the before/after comparison. Run the generator or full build to refresh the other views. The Godot capture confirms the model renders in the target engine:
+
+![Godot Compatibility-renderer capture](../art_source/output/v2/godot_engine_capture00000000.png)
 
 ## Remaining limitations
 
-The character is still stylized low-poly. The shoulders and upper arms are slimmer but retain a rounded cap. A small dark inner-collar arc and angular skin-to-collar transition remain visible in close-up; the shirt, waistcoat, lapels, and tie read more clearly but still have simplified facets. Trouser legs remain smooth. The Godot capture confirms the imported scene renders and shows the whole chair/character composition, though the game camera leaves substantial surrounding space. Technical checks do not imply flawless tailoring or collision-free deformation at every interpolated time. Current visual inspection covers the saved six talking frames and the required idle/talking preview views.
+The sleeves now meet the jacket through the inspected idle and talking poses, though the low-poly shoulder silhouette is still somewhat rounded. The large source neck flaps and isolated pointed wrist pieces are absent in the reviewed frames. A narrow dark inner-collar seam and a visible low-poly transition at the back of the neck remain; the three-piece suit and face are still stylized. The Godot frame shows the full chair and character at the existing demo camera distance, so Blender close-ups remain the more useful view for garment detail. These results cover the saved animation samples, not every interpolated frame.
 
 ## Reproduction
 
-From the repository root, run `.\build_and_validate.ps1`. The script locates Blender and Godot from command-line arguments, environment variables, `PATH`, or its documented Windows defaults. It regenerates the character, imports it into Godot, runs `godot/tests/validate_suit.gd`, starts the demo headlessly, and captures a Compatibility-renderer PNG.
+From the repository root, run `.\build_and_validate.ps1`. It locates Blender and Godot through command-line parameters, environment variables, `PATH`, or documented Windows defaults; regenerates the character; imports it into Godot; runs `godot/tests/validate_suit.gd`; starts the demo; and captures a Compatibility-renderer PNG.
