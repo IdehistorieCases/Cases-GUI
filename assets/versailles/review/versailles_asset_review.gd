@@ -247,4 +247,3 @@ func _add_label(text_value: String, label_position: Vector3, label_color: Color)
 	label.no_depth_test = true
 	add_child(label)
 
-
