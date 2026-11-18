@@ -31,6 +31,6 @@ The idle and talking renders show a narrower torso, shaped jacket profile, taper
 ## Known limitations
 
 - The available Quaternius base package contains `SuperHero_Male` but no average-build male replacement. The generator keeps its compatible skeleton and source mesh; the retained visible skin is limited to the head/neck and hands while suit parameters define the visible torso and limb silhouette. An editable corrective shape key is also retained on the source mesh.
-- The character remains stylized low-poly. Shoulder transitions, the angular lapel faces, face/hair, and dress-shoe details are still simplified and could use further art-direction.
+- The character remains stylized low-poly. The dark inner jacket arc at the neckline is still visible in close-ups; shoulder transitions, angular lapel faces, face/hair, and dress-shoe details are simplified and could use further art-direction.
 - Blender Eevee is the source of visual screenshots. A Godot GUI capture was attempted, but the window rendered black in this environment. Godot import, animation, and headless Compatibility-renderer runtime are validated; Godot visual appearance is not.
 - The validator and Blender review cover seven animation samples and six rendered talking frames. They do not prove collision-free deformation at every interpolated time or across other animation packs/body types.
