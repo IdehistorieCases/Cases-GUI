@@ -7,10 +7,12 @@ The generator deliberately keeps the original 65-bone Quaternius rig. Garment
 profiles are controlled in PRESET; sleeve and trouser rings are derived from
 the rest-pose bones rather than world-space cylinders.
 """
+import argparse
 import bpy
 import bmesh
 import math
 import pathlib
+import sys
 from mathutils import Vector
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -18,9 +20,10 @@ SOURCE = ROOT / "art_source" / "vendor" / "quaternius"
 OUTPUT = ROOT / "art_source" / "output"
 V2_OUTPUT = OUTPUT / "v2"
 GODOT = ROOT / "godot" / "assets" / "characters"
-OUTPUT.mkdir(parents=True, exist_ok=True)
-V2_OUTPUT.mkdir(parents=True, exist_ok=True)
-GODOT.mkdir(parents=True, exist_ok=True)
+sys.path.insert(0, str(ROOT))
+from art_source.scripts.persona_presets import (
+    PERSONA_IDS, resolve_persona, validate_persona_parameters, variant_output_paths,
+)
 
 # One polished, reusable starting point. Dimensions are half-widths/radii in
 # the source rig's meter-scale rest pose; colors are linear Blender RGB values.
@@ -34,6 +37,17 @@ PRESET = {
         "neck_depth_reduction": 0.06,
         "neck_length_scale": 0.92,
     },
+    "identity": {"hair_style": "close_crop", "facial_hair": "moustache"},
+    "face": {
+        "head_width_scale": 1.0, "jaw_width_scale": 1.0, "cheek_fullness": 1.0,
+        "face_height_scale": 1.0, "face_depth_scale": 1.0,
+    },
+    "fit": {
+        "body_clearance": 0.004, "jacket_armhole_overlap": 0.028,
+        "cuff_overlap": 0.012, "waistcoat_clearance": 0.004,
+        "shirt_clearance": 0.002, "trouser_clearance": 0.004,
+        "shoe_foot_overlap": 0.006,
+    },
     "jacket": {
         "hip_half_width": 0.196,
         "waist_half_width": 0.174,
@@ -41,6 +55,9 @@ PRESET = {
         "shoulder_half_width": 0.180,
         "depth_scale": 0.92,
         "front_opening_angle": 0.42,
+        "front_style": "single_breasted",
+        "fit_clearance": 0.005,
+        "armhole_overlap": 0.028,
         "collar_half_width": 0.067,
         "collar_depth": 0.048,
         "sleeve_shoulder_radius": 0.045,
@@ -54,14 +71,15 @@ PRESET = {
         "sleeve_length": 0.92,
         "lapel_width_scale": 0.90,
     },
-    "waistcoat": {"width_scale": 0.94, "depth_scale": 0.88},
+    "waistcoat": {"width_scale": 0.94, "depth_scale": 0.88, "fit_clearance": 0.004},
     "shirt": {
         "width_scale": 0.62,
         "depth_scale": 0.64,
         "neckline_half_width": 0.048,
         "neckline_depth": 0.040,
+        "fit_clearance": 0.002,
     },
-    "cuff": {"diameter": 0.048, "length": 0.034},
+    "cuff": {"diameter": 0.048, "length": 0.034, "overlap": 0.012},
     "trousers": {
         "hip_radius": 0.078,
         "thigh_radius": 0.069,
@@ -69,8 +87,9 @@ PRESET = {
         "calf_radius": 0.051,
         "ankle_radius": 0.040,
         "depth_scale": 0.86,
+        "fit_clearance": 0.004,
     },
-    "shoe": {"length_scale": 0.96, "width_scale": 0.94, "heel_height": 0.012},
+    "shoe": {"length_scale": 0.96, "width_scale": 0.94, "heel_height": 0.012, "foot_overlap": 0.006},
     "palette": {
         "jacket": (0.038, 0.055, 0.090),
         "lapel": (0.052, 0.068, 0.100),
@@ -87,6 +106,30 @@ PRESET = {
         "backdrop": (0.40, 0.41, 0.40),
     },
 }
+
+# Parse and validate the complete selected profile before creating directories,
+# deleting scene objects, or touching any generated file.
+parser = argparse.ArgumentParser(description="Build the CASES seated negotiator")
+parser.add_argument("--persona", choices=("default", *PERSONA_IDS), default="default")
+script_args = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
+args = parser.parse_args(script_args)
+PERSONA_ID = args.persona
+PRESET = resolve_persona(PERSONA_ID, PRESET)
+validate_persona_parameters(PRESET)
+VARIANT_PATHS = variant_output_paths(ROOT, PERSONA_ID) if PERSONA_ID != "default" else None
+if VARIANT_PATHS:
+    GLB_PATH = VARIANT_PATHS["glb"]
+    BLEND_PATH = VARIANT_PATHS["blend"]
+    PREVIEW_OUTPUT = VARIANT_PATHS["render_dir"]
+else:
+    GLB_PATH = GODOT / "cases_suited_negotiator.glb"
+    BLEND_PATH = OUTPUT / "cases_suited_negotiator.blend"
+    PREVIEW_OUTPUT = V2_OUTPUT
+    OUTPUT.mkdir(parents=True, exist_ok=True)
+    V2_OUTPUT.mkdir(parents=True, exist_ok=True)
+GODOT.mkdir(parents=True, exist_ok=True)
+PREVIEW_OUTPUT.mkdir(parents=True, exist_ok=True)
+print("PERSONA:", PERSONA_ID)
 
 bpy.ops.object.select_all(action="SELECT")
 bpy.ops.object.delete(use_global=False)
@@ -1114,7 +1157,7 @@ print("NLA", [(track.name, [strip.action.name for strip in track.strips]) for tr
 for track in rig.animation_data.nla_tracks:
     track.mute = False
 
-glb_path = GODOT / "cases_suited_negotiator.glb"
+glb_path = GLB_PATH
 bpy.ops.export_scene.gltf(
     filepath=str(glb_path),
     export_format="GLB",
@@ -1124,7 +1167,7 @@ bpy.ops.export_scene.gltf(
     export_yup=True,
 )
 print("EXPORTED", str(glb_path), glb_path.stat().st_size)
-bpy.ops.wm.save_as_mainfile(filepath=str(OUTPUT / "cases_suited_negotiator.blend"))
+bpy.ops.wm.save_as_mainfile(filepath=str(BLEND_PATH))
 print("SAVED BLEND")
 
 # Blender preview environment. None of these objects enter the exported GLB.
@@ -1165,7 +1208,9 @@ scene.world.color = (0.30, 0.30, 0.30)
 scene.view_settings.view_transform = "AgX"
 
 
-def render_view(filename, action, frame, location, target, lens=50, destination=V2_OUTPUT):
+def render_view(filename, action, frame, location, target, lens=50, destination=None):
+    if destination is None:
+        destination = PREVIEW_OUTPUT
     camera.location = location
     camera.rotation_euler = (Vector(target) - camera.location).to_track_quat("-Z", "Y").to_euler()
     camera.data.lens = lens
@@ -1182,23 +1227,30 @@ front = (0.0, -3.50, 1.32)
 three_quarter = (1.52, -3.18, 1.62)
 side_camera = (3.55, 0.10, 1.30)
 torso_target = (0.0, 0.29, 0.91)
-render_view("seated_idle_front.png", idle, 15, front, torso_target)
-render_view("seated_idle_three_quarter.png", idle, 15, three_quarter, torso_target)
-render_view("seated_idle_side.png", idle, 15, side_camera, torso_target)
-render_view("seated_talking_front.png", talking, 22, front, torso_target)
-render_view("seated_talking_three_quarter.png", talking, 22, three_quarter, torso_target)
-render_view("left_sleeve_detail.png", talking, 30, (0.62, -1.55, 1.12), (0.36, 0.12, 1.05), 56)
-render_view("right_sleeve_detail.png", talking, 22, (-0.62, -1.55, 1.13), (-0.36, 0.12, 1.05), 56)
-render_view("jacket_detail.png", idle, 15, (0.0, -2.16, 1.65), (0.0, 0.19, 1.36), 60)
-
-# Keep sampled talking frames for elbow/wrist inspection and iteration.
-frames_dir = V2_OUTPUT / "talking_frames"
-frames_dir.mkdir(parents=True, exist_ok=True)
-for frame in (1, 10, 22, 30, 45, 60):
-    render_view(f"talking_frame_{frame:02d}.png", talking, frame, front, torso_target, destination=frames_dir)
-
-# Preserve the original two-preview paths for existing project workflows.
-for filename, action, frame in (("seated_idle.png", idle, 15), ("seated_talking.png", talking, 22)):
-    render_view(filename, action, frame, three_quarter, torso_target, destination=OUTPUT)
-
-print("DONE: 65-bone suit GLB, editable blend and V2 visual review set")
+if PERSONA_ID == "default":
+    render_view("seated_idle_front.png", idle, 15, front, torso_target)
+    render_view("seated_idle_three_quarter.png", idle, 15, three_quarter, torso_target)
+    render_view("seated_idle_side.png", idle, 15, side_camera, torso_target)
+    render_view("seated_talking_front.png", talking, 22, front, torso_target)
+    render_view("seated_talking_three_quarter.png", talking, 22, three_quarter, torso_target)
+    render_view("left_sleeve_detail.png", talking, 30, (0.62, -1.55, 1.12), (0.36, 0.12, 1.05), 56)
+    render_view("right_sleeve_detail.png", talking, 22, (-0.62, -1.55, 1.13), (-0.36, 0.12, 1.05), 56)
+    render_view("jacket_detail.png", idle, 15, (0.0, -2.16, 1.65), (0.0, 0.19, 1.36), 60)
+    frames_dir = V2_OUTPUT / "talking_frames"
+    frames_dir.mkdir(parents=True, exist_ok=True)
+    for frame in (1, 10, 22, 30, 45, 60):
+        render_view(f"talking_frame_{frame:02d}.png", talking, frame, front, torso_target, destination=frames_dir)
+    for filename, action, frame in (("seated_idle.png", idle, 15), ("seated_talking.png", talking, 22)):
+        render_view(filename, action, frame, three_quarter, torso_target, destination=OUTPUT)
+else:
+    render_view("seated_idle_front.png", idle, 15, front, torso_target)
+    render_view("seated_idle_three_quarter.png", idle, 15, three_quarter, torso_target)
+    render_view("seated_idle_side.png", idle, 15, side_camera, torso_target)
+    render_view("seated_talking_front.png", talking, 22, front, torso_target)
+    render_view("talking_frame_22.png", talking, 22, front, torso_target)
+    render_view("talking_frame_30.png", talking, 30, front, torso_target)
+    render_view("left_sleeve_detail.png", talking, 30, (0.62, -1.55, 1.12), (0.36, 0.12, 1.05), 56)
+    render_view("right_sleeve_detail.png", talking, 22, (-0.62, -1.55, 1.13), (-0.36, 0.12, 1.05), 56)
+    render_view("jacket_detail.png", idle, 15, (0.0, -2.16, 1.65), (0.0, 0.19, 1.36), 60)
+    render_view("face_detail.png", idle, 15, (0.0, -1.20, 1.74), (0.0, 0.0, 1.68), 85)
+print("DONE:", PERSONA_ID, "65-bone suit GLB, editable blend and isolated review set")
