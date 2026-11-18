@@ -2,6 +2,9 @@
 extends Node3D
 ## Adds authored decorative detail to the otherwise reusable Versailles room.
 
+const LANDSCAPE_FRAME_SCENE: PackedScene = preload(
+	"res://assets/versailles/optimized/polyhaven/fancy_picture_frame_01/fancy_picture_frame_01_2k.gltf"
+)
 const DECOR_ROOT_NAME := "Generated_RoomDecor"
 const FLOOR_TOP := 0.065
 const RUG_TOP := 0.078
@@ -105,51 +108,26 @@ func _add_gallery(parent: Node3D) -> void:
 		var side := -1.0 if side_index == 0 else 1.0
 		var yaw := PI * 0.5 if side < 0.0 else -PI * 0.5
 		for frame_index in range(2):
-			var along_wall := -1.65 if frame_index == 0 else 1.65
-			var frame := Node3D.new()
+			# Center pictures in the outer wall panels instead of covering their pilasters.
+			var along_wall := -2.32 if frame_index == 0 else 2.32
+			var frame := LANDSCAPE_FRAME_SCENE.instantiate() as Node3D
+			if frame == null:
+				push_error("RoomDecorations: the landscape-frame root must be a Node3D")
+				continue
 			frame.name = "LandscapeFrame_%02d_%02d" % [side_index + 1, frame_index + 1]
 			frame.position = Vector3(side * WALL_PLANE, 2.76, along_wall)
 			frame.rotation.y = yaw
+			frame.scale = Vector3(1.72, 1.72, 1.72)
 			parent.add_child(frame)
-			_add_landscape_frame(frame, side_index * 2 + frame_index)
+			_apply_landscape_material(frame, _landscape_material(side_index * 2 + frame_index))
 
 
-func _add_landscape_frame(parent: Node3D, variant: int) -> void:
-	var frame_width := 0.92
-	var frame_height := 1.18
-	var rail := 0.065
-	var dark_wood := _material("art_wood", Color8(53, 34, 26), 0.43)
-	var gold := _material("art_gold", Color8(177, 132, 59), 0.33, 0.46)
-	var bright_gold := _material("art_highlight", Color8(213, 177, 102), 0.30, 0.52)
-
-	_add_box(parent, "FrameShadowBacking", Vector3(frame_width, frame_height, 0.065), Vector3(0.0, 0.0, 0.035), dark_wood)
-	_add_box(parent, "FrameTop", Vector3(frame_width, rail, 0.085), Vector3(0.0, frame_height * 0.5 - rail * 0.5, 0.065), gold)
-	_add_box(parent, "FrameBottom", Vector3(frame_width, rail, 0.085), Vector3(0.0, -frame_height * 0.5 + rail * 0.5, 0.065), gold)
-	_add_box(parent, "FrameLeft", Vector3(rail, frame_height - rail * 2.0, 0.085), Vector3(-frame_width * 0.5 + rail * 0.5, 0.0, 0.065), gold)
-	_add_box(parent, "FrameRight", Vector3(rail, frame_height - rail * 2.0, 0.085), Vector3(frame_width * 0.5 - rail * 0.5, 0.0, 0.065), gold)
-	_add_box(parent, "FrameInnerTop", Vector3(frame_width - rail * 2.2, 0.014, 0.016), Vector3(0.0, frame_height * 0.5 - rail - 0.018, 0.11), bright_gold)
-	_add_box(parent, "FrameInnerBottom", Vector3(frame_width - rail * 2.2, 0.014, 0.016), Vector3(0.0, -frame_height * 0.5 + rail + 0.018, 0.11), bright_gold)
-	_add_box(parent, "FrameInnerLeft", Vector3(0.014, frame_height - rail * 2.25, 0.016), Vector3(-frame_width * 0.5 + rail + 0.018, 0.0, 0.11), bright_gold)
-	_add_box(parent, "FrameInnerRight", Vector3(0.014, frame_height - rail * 2.25, 0.016), Vector3(frame_width * 0.5 - rail - 0.018, 0.0, 0.11), bright_gold)
-
-	var canvas_mesh := QuadMesh.new()
-	canvas_mesh.size = Vector2(frame_width - rail * 2.45, frame_height - rail * 2.45)
-	var canvas := MeshInstance3D.new()
-	canvas.name = "PastoralLandscape_%02d" % variant
-	canvas.mesh = canvas_mesh
-	canvas.position = Vector3(0.0, 0.0, 0.091)
-	canvas.material_override = _landscape_material(variant)
-	parent.add_child(canvas)
-
-	for corner_x in [-1.0, 1.0]:
-		for corner_y in [-1.0, 1.0]:
-			_add_sphere(
-				parent,
-				"GiltCornerRose",
-				0.022,
-				Vector3(corner_x * (frame_width * 0.5 - rail * 0.5), corner_y * (frame_height * 0.5 - rail * 0.5), 0.114),
-				bright_gold
-			)
+func _apply_landscape_material(node: Node, material: StandardMaterial3D) -> void:
+	if node is MeshInstance3D and str(node.name).to_lower().contains("canvas"):
+		node.material_override = material
+		return
+	for child in node.get_children():
+		_apply_landscape_material(child, material)
 
 
 func _landscape_material(variant: int) -> StandardMaterial3D:
@@ -219,9 +197,9 @@ func _landscape_material(variant: int) -> StandardMaterial3D:
 func _add_wall_sconces(parent: Node3D) -> void:
 	for side in [-1.0, 1.0]:
 		var side_yaw := PI * 0.5 if side < 0.0 else -PI * 0.5
-		_add_wall_sconce(parent, "SideSconce_%s" % str(side), Vector3(side * WALL_PLANE, 2.43, 0.0), side_yaw)
-		_add_wall_sconce(parent, "RearSconce_%s" % str(side), Vector3(side * 3.2, 2.43, -WALL_PLANE), 0.0)
-		_add_wall_sconce(parent, "EntrySconce_%s" % str(side), Vector3(side * 1.55, 2.43, WALL_PLANE), PI)
+		for panel in [-1.0, 1.0]:
+			var position := Vector3(side * WALL_PLANE, 2.43, panel * 0.78)
+			_add_wall_sconce(parent, "SideSconce_%s_%s" % [str(side), str(panel)], position, side_yaw)
 
 
 func _add_wall_sconce(parent: Node3D, node_name: String, position: Vector3, wall_yaw: float) -> void:
@@ -279,42 +257,106 @@ func _add_palm(parent: Node3D, node_name: String, position: Vector3, variant: in
 		_material("palm_leaf_3", Color8(61, 112, 71), 0.90)
 	]
 	var angle_offset := float(variant) * 0.34
-	for leaf_index in range(11):
-		var angle := TAU * float(leaf_index) / 11.0 + angle_offset
-		var length := 0.78 + float((leaf_index + variant) % 3) * 0.075
-		var leaf_instance := MeshInstance3D.new()
-		leaf_instance.name = "PalmFrond_%02d" % leaf_index
-		leaf_instance.mesh = _palm_leaf_mesh(angle, length, 0.15)
-		leaf_instance.material_override = leaves[leaf_index % leaves.size()]
-		plant.add_child(leaf_instance)
+	for frond_index in range(9):
+		var angle := TAU * float(frond_index) / 9.0 + angle_offset + sin(float(frond_index) * 2.4) * 0.08
+		var length := 0.78 + float((frond_index + variant) % 3) * 0.07
+		_add_palm_frond(
+			plant,
+			"PalmFrond_%02d" % frond_index,
+			angle,
+			length,
+			1.19 + float(frond_index % 2) * 0.035,
+			0.53,
+			leaves[frond_index % leaves.size()],
+			1.0
+		)
 
-	for leaf_index in range(5):
-		var angle := TAU * float(leaf_index) / 5.0 + angle_offset + 0.25
-		var shoot := MeshInstance3D.new()
-		shoot.name = "YoungFrond_%02d" % leaf_index
-		shoot.mesh = _palm_leaf_mesh(angle, 0.60, 0.09)
-		shoot.material_override = leaves[(leaf_index + 1) % leaves.size()]
-		plant.add_child(shoot)
+	for frond_index in range(3):
+		var angle := TAU * float(frond_index) / 3.0 + angle_offset + 0.31
+		_add_palm_frond(
+			plant,
+			"YoungFrond_%02d" % frond_index,
+			angle,
+			0.57,
+			1.24,
+			0.12,
+			leaves[(frond_index + 1) % leaves.size()],
+			0.68
+		)
 
 
-func _palm_leaf_mesh(angle: float, length: float, width: float) -> ArrayMesh:
+func _add_palm_frond(
+	parent: Node3D,
+	node_name: String,
+	angle: float,
+	length: float,
+	crown_y: float,
+	droop: float,
+	material: StandardMaterial3D,
+	leaflet_scale: float
+) -> void:
 	var direction := Vector3(cos(angle), 0.0, sin(angle))
 	var across := Vector3(-direction.z, 0.0, direction.x)
-	var start := Vector3(0.0, 1.04, 0.0)
-	var middle := direction * (length * 0.52) + Vector3(0.0, 0.10, 0.0)
-	var tip := direction * length + Vector3(0.0, -0.28, 0.0)
-	var left := middle - across * width * 0.5
-	var right := middle + across * width * 0.5
-	var normal := (left - start).cross(tip - start).normalized()
-	var vertices := PackedVector3Array([start, left, tip, start, tip, right])
-	var normals := PackedVector3Array([normal, normal, normal, normal, normal, normal])
-	var arrays: Array = []
-	arrays.resize(Mesh.ARRAY_MAX)
-	arrays[Mesh.ARRAY_VERTEX] = vertices
-	arrays[Mesh.ARRAY_NORMAL] = normals
-	var mesh := ArrayMesh.new()
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-	return mesh
+	var surface := SurfaceTool.new()
+	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+
+	# A tapered center rib follows the gentle arch of each frond.
+	for segment in range(10):
+		var t0 := float(segment) / 10.0
+		var t1 := float(segment + 1) / 10.0
+		var center0 := _palm_rachis_point(direction, length, t0, crown_y, droop)
+		var center1 := _palm_rachis_point(direction, length, t1, crown_y, droop)
+		var rib_width0 := 0.014 * (1.0 - t0 * 0.48)
+		var rib_width1 := 0.014 * (1.0 - t1 * 0.48)
+		var left0 := center0 - across * rib_width0
+		var right0 := center0 + across * rib_width0
+		var left1 := center1 - across * rib_width1
+		var right1 := center1 + across * rib_width1
+		_add_surface_triangle(surface, left0, right0, right1)
+		_add_surface_triangle(surface, left0, right1, left1)
+
+	# Opposing tapered leaflets make a feathered palm silhouette rather than a fan of flat spikes.
+	for leaflet_index in range(12):
+		var t: float = 0.12 + float(leaflet_index) * 0.067
+		var base: Vector3 = _palm_rachis_point(direction, length, t, crown_y, droop)
+		var leaflet_length: float = leaflet_scale * (0.08 + 0.37 * pow(sin(PI * t), 0.72))
+		var blade_width: float = 0.075 * sin(PI * t) * leaflet_scale
+		for side in [-1.0, 1.0]:
+			var side_direction: Vector3 = across * side
+			var mid: Vector3 = (
+				base
+				+ side_direction * leaflet_length * 0.58
+				+ direction * leaflet_length * 0.15
+				+ Vector3(0.0, -0.018, 0.0)
+			)
+			var tip: Vector3 = (
+				base
+				+ side_direction * leaflet_length
+				+ direction * leaflet_length * 0.29
+				+ Vector3(0.0, -0.10 * t, 0.0)
+			)
+			var width_axis := direction * blade_width + Vector3.UP * blade_width * 0.22
+			var outer_edge: Vector3 = mid + width_axis
+			var inner_edge: Vector3 = mid - width_axis
+			_add_surface_triangle(surface, base, outer_edge, tip)
+			_add_surface_triangle(surface, base, tip, inner_edge)
+
+	surface.generate_normals()
+	var frond := MeshInstance3D.new()
+	frond.name = node_name
+	frond.mesh = surface.commit()
+	frond.material_override = material
+	parent.add_child(frond)
+
+
+func _palm_rachis_point(direction: Vector3, length: float, t: float, crown_y: float, droop: float) -> Vector3:
+	return Vector3(direction.x * length * t, crown_y + 0.14 * sin(PI * t) - droop * t, direction.z * length * t)
+
+
+func _add_surface_triangle(surface: SurfaceTool, a: Vector3, b: Vector3, c: Vector3) -> void:
+	surface.add_vertex(a)
+	surface.add_vertex(b)
+	surface.add_vertex(c)
 
 
 func _add_archive_books(parent: Node3D) -> void:

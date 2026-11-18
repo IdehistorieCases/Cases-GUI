@@ -22,7 +22,7 @@ A reusable, character-free formal diplomatic room in the project's 1 unit = 1 me
 - Use Vintage Wooden Drawer 01 against one side wall as a low storage cabinet, dressed with authored bound books, an inkwell and a folded document.
 - Use Lantern Chandelier 01 centered under the ceiling.
 - Use Dark Paneled Wood on lower wall panels and Diagonal Parquet on the floor.
-- A burgundy carpet with a muted gold border defines the negotiation area. Four authored, non-specific landscape pictures and six warm brass sconces decorate the upper walls; two low-poly potted palms soften the rear corners.
+- A burgundy carpet with a muted gold border defines the negotiation area. Four generic landscapes in ornate CC0 frames sit centered between the upper side-wall pilasters. Four brass sconces occupy the other panels; two potted palms soften the rear corners.
 - Green Chair 01 supplies the generated chairs. The seating component rotates the chairs toward the table and creates configurable flags and papers at matching places.
 - Exclude Vintage Cabinet 01 from runtime because of its 61k triangle count. Exclude the modern stationery, supplied landscape image, unverified flags/maps/art, and inaccessible Sketchfab sources.
 
