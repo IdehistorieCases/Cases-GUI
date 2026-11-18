@@ -10,6 +10,7 @@
 [ext_resource type="Texture2D" uid="uid://bel87661vj0x7" path="res://assets/versailles/optimized/polyhaven/diagonal_parquet/textures/diagonal_parquet_arm_1k.jpg" id="8_floor_arm"]
 [ext_resource type="Texture2D" uid="uid://ogmgmat75r3o" path="res://assets/versailles/optimized/polyhaven/dark_paneled_wood/textures/dark_paneled_wood_arm_1k.jpg" id="9_wall_arm"]
 [ext_resource type="Script" uid="uid://cuccixl7ilpqs" path="res://scripts/negotiation_seating.gd" id="10_seating"]
+[ext_resource type="Script" uid="uid://cd7g4a5yhfjky" path="res://scripts/versailles_room_decor.gd" id="11_opq11"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_osat4"]
 albedo_texture = ExtResource("1_57bx7")
@@ -679,3 +680,6 @@ transform = Transform3D(0.8480481, -0.105648905, 0.51928097, 0, 0.9799247, 0.199
 
 [node name="RoomEnvironment" type="WorldEnvironment" parent="." unique_id=1502636773]
 environment = SubResource("Environment_4nkyk")
+
+[node name="RoomDecorations" type="Node3D" parent="." unique_id=1469918709]
+script = ExtResource("11_opq11")
