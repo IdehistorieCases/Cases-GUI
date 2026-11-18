@@ -56,8 +56,6 @@ PRESET = {
         "depth_scale": 0.92,
         "front_opening_angle": 0.42,
         "front_style": "single_breasted",
-        "fit_clearance": 0.005,
-        "armhole_overlap": 0.028,
         "collar_half_width": 0.067,
         "collar_depth": 0.048,
         "sleeve_shoulder_radius": 0.045,
@@ -71,15 +69,14 @@ PRESET = {
         "sleeve_length": 0.92,
         "lapel_width_scale": 0.90,
     },
-    "waistcoat": {"width_scale": 0.94, "depth_scale": 0.88, "fit_clearance": 0.004},
+    "waistcoat": {"width_scale": 0.94, "depth_scale": 0.88},
     "shirt": {
         "width_scale": 0.62,
         "depth_scale": 0.64,
         "neckline_half_width": 0.048,
         "neckline_depth": 0.040,
-        "fit_clearance": 0.002,
     },
-    "cuff": {"diameter": 0.048, "length": 0.034, "overlap": 0.012},
+    "cuff": {"diameter": 0.048, "length": 0.034},
     "trousers": {
         "hip_radius": 0.078,
         "thigh_radius": 0.069,
@@ -87,9 +84,8 @@ PRESET = {
         "calf_radius": 0.051,
         "ankle_radius": 0.040,
         "depth_scale": 0.86,
-        "fit_clearance": 0.004,
     },
-    "shoe": {"length_scale": 0.96, "width_scale": 0.94, "heel_height": 0.012, "foot_overlap": 0.006},
+    "shoe": {"length_scale": 0.96, "width_scale": 0.94, "heel_height": 0.012},
     "palette": {
         "jacket": (0.038, 0.055, 0.090),
         "lapel": (0.052, 0.068, 0.100),
@@ -363,7 +359,7 @@ JACKET_PROFILE = [
     (1.492, JACKET["collar_half_width"] * 1.48, 0.067 * JACKET["depth_scale"], 0.036),
     (1.505, JACKET["collar_half_width"], JACKET["collar_depth"], 0.036),
 ]
-JACKET_PROFILE = offset_profile(JACKET_PROFILE, JACKET["fit_clearance"])
+JACKET_PROFILE = offset_profile(JACKET_PROFILE, PRESET["fit"]["body_clearance"])
 
 
 def scaled_profile(profile, width_scale, depth_scale):
@@ -372,11 +368,11 @@ def scaled_profile(profile, width_scale, depth_scale):
 
 WAISTCOAT_PROFILE = offset_profile(
     scaled_profile(JACKET_PROFILE, PRESET["waistcoat"]["width_scale"], PRESET["waistcoat"]["depth_scale"]),
-    PRESET["waistcoat"]["fit_clearance"],
+    PRESET["fit"]["waistcoat_clearance"],
 )
 SHIRT_PROFILE = offset_profile(
     scaled_profile(JACKET_PROFILE, PRESET["shirt"]["width_scale"], PRESET["shirt"]["depth_scale"]),
-    PRESET["shirt"]["fit_clearance"],
+    PRESET["fit"]["shirt_clearance"],
 )
 # Narrow the shirt's upper edge from the shoulder line into the neck opening.
 # This keeps the open-front jacket from revealing a broad, hollow shoulder ring.
@@ -439,8 +435,8 @@ def make_jacket_neck_yoke():
     faces = []
     for z, inner_x, inner_y in sections:
         outer_x, outer_y, center_y = profile_at(JACKET_PROFILE, z)
-        inner_x += JACKET["fit_clearance"]
-        inner_y += JACKET["fit_clearance"]
+        inner_x += PRESET["fit"]["body_clearance"]
+        inner_y += PRESET["fit"]["body_clearance"]
         for angular_index in range(angular_count + 1):
             angle = opening + angular_index * (2.0 * math.pi - 2.0 * opening) / angular_count
             for radial_index in range(radial_steps + 1):
@@ -482,7 +478,7 @@ def make_waistcoat():
         for z, inner, outer in rows:
             for column in range(subdivisions + 1):
                 x = side * (inner + (outer - inner) * column / subdivisions)
-                vertices.append((x, surface_y(WAISTCOAT_PROFILE, x, z, PRESET["waistcoat"]["fit_clearance"]), z))
+                vertices.append((x, surface_y(WAISTCOAT_PROFILE, x, z, PRESET["fit"]["waistcoat_clearance"]), z))
                 weights.append(torso_weights(z))
         for row in range(len(rows) - 1):
             for column in range(subdivisions):
@@ -702,7 +698,7 @@ def make_shirt_front():
     for z, half_width in rows:
         for column in range(subdivisions + 1):
             x = -half_width + 2.0 * half_width * column / subdivisions
-            vertices.append((x, surface_y(SHIRT_PROFILE, x, z, PRESET["shirt"]["fit_clearance"]), z))
+            vertices.append((x, surface_y(SHIRT_PROFILE, x, z, PRESET["fit"]["shirt_clearance"]), z))
             weights.append(torso_weights(z))
     for row in range(len(rows) - 1):
         for column in range(subdivisions):
@@ -744,7 +740,7 @@ def make_lapels():
                     across = column / column_count
                     x = inner_x * (1.0 - across) + outer_x * across
                     z = inner_z * (1.0 - across) + outer_z * across
-                    vertices.append((side * x, surface_y(JACKET_PROFILE, side * x, z, JACKET["fit_clearance"]), z))
+                    vertices.append((side * x, surface_y(JACKET_PROFILE, side * x, z, PRESET["fit"]["body_clearance"]), z))
                     weights.append(torso_weights(z))
             for row in range(row_count):
                 for column in range(column_count):
@@ -777,7 +773,7 @@ def make_double_breasted_front():
                 t = column / columns
                 x = x0 + (x1 - x0) * t
                 overlap_depth = 0.002 if side < 0 else 0.004
-                front_clearance = JACKET["fit_clearance"] + overlap_depth
+                front_clearance = PRESET["fit"]["body_clearance"] + overlap_depth
                 vertices.append((x, surface_y(JACKET_PROFILE, x, z, front_clearance), z))
                 weights.append(torso_weights(z))
         for row in range(len(row_widths) - 1):
@@ -879,7 +875,7 @@ def make_trouser(side, label):
         knee.lerp(ankle, 0.94),
         ankle,
     ]
-    clearance = settings["fit_clearance"]
+    clearance = PRESET["fit"]["trouser_clearance"]
     radii = [
         settings["hip_radius"] + clearance, settings["hip_radius"] * 0.98 + clearance,
         settings["thigh_radius"] + clearance, settings["thigh_radius"] * 0.95 + clearance,
@@ -918,7 +914,7 @@ def make_shoe(label):
     settings = PRESET["shoe"]
     width_scale = settings["width_scale"]
     length_scale = settings["length_scale"]
-    positions = [-0.018 - settings["foot_overlap"], 0.0, 0.032, 0.067, 0.101, 0.136, 0.165, 0.185]
+    positions = [-0.018 - PRESET["fit"]["shoe_foot_overlap"], 0.0, 0.032, 0.067, 0.101, 0.136, 0.165, 0.185]
     widths = [0.031, 0.038, 0.043, 0.044, 0.043, 0.038, 0.030, 0.020]
     heights = [0.021, 0.027, 0.032, 0.033, 0.031, 0.027, 0.020, 0.010]
     vertices = []
@@ -987,12 +983,12 @@ def make_buttons():
         for row, z in enumerate((1.145, 1.225, 1.305)):
             for column, side in enumerate((-1.0, 1.0)):
                 x = side * 0.085
-                y = surface_y(JACKET_PROFILE, x, z, JACKET["fit_clearance"] + 0.011)
+                y = surface_y(JACKET_PROFILE, x, z, PRESET["fit"]["body_clearance"] + 0.011)
                 uvball(f"Senior double-breasted button {row + 1}-{column + 1}", (x, y, z), (0.007, 0.004, 0.007), metal_material, torso_weights(z))
     else:
         for index, x in enumerate((-0.142, 0.142)):
             z = 1.095
-            y = surface_y(JACKET_PROFILE, x, z, JACKET["fit_clearance"] + 0.008)
+            y = surface_y(JACKET_PROFILE, x, z, PRESET["fit"]["body_clearance"] + 0.008)
             uvball("Jacket front button " + str(index + 1), (x, y, z), (0.006, 0.0035, 0.006), metal_material, torso_weights(z))
 
 
