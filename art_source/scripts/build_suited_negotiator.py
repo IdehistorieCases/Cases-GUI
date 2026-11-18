@@ -1212,7 +1212,12 @@ def make_neck():
         for column in range(radial_count):
             angle = 2.0 * math.pi * column / radial_count
             adjusted_z = neck_midpoint + (z - neck_midpoint) * neck_length_scale
-            vertices.append((radius_x * math.sin(angle), 0.038 - radius_y * math.cos(angle), adjusted_z))
+            # The source head and jaw lean forward relative to the neck bone.
+            # Bend the upper loft toward the face so its capped end nests inside
+            # the underside of the jaw instead of stopping behind it.
+            headward = smoothstep((z - 1.49) / (1.60 - 1.49))
+            center_y = 0.038 - 0.050 * headward
+            vertices.append((radius_x * math.sin(angle), center_y - radius_y * math.cos(angle), adjusted_z))
             weights.append(bone_weights)
     for row in range(len(sections) - 1):
         for column in range(radial_count):
