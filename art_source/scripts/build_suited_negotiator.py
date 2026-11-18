@@ -7,10 +7,12 @@ The generator deliberately keeps the original 65-bone Quaternius rig. Garment
 profiles are controlled in PRESET; sleeve and trouser rings are derived from
 the rest-pose bones rather than world-space cylinders.
 """
+import argparse
 import bpy
 import bmesh
 import math
 import pathlib
+import sys
 from mathutils import Vector
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -18,9 +20,10 @@ SOURCE = ROOT / "art_source" / "vendor" / "quaternius"
 OUTPUT = ROOT / "art_source" / "output"
 V2_OUTPUT = OUTPUT / "v2"
 GODOT = ROOT / "godot" / "assets" / "characters"
-OUTPUT.mkdir(parents=True, exist_ok=True)
-V2_OUTPUT.mkdir(parents=True, exist_ok=True)
-GODOT.mkdir(parents=True, exist_ok=True)
+sys.path.insert(0, str(ROOT))
+from art_source.scripts.persona_presets import (
+    PERSONA_IDS, resolve_persona, transform_face_point, validate_persona_parameters, variant_output_paths,
+)
 
 # One polished, reusable starting point. Dimensions are half-widths/radii in
 # the source rig's meter-scale rest pose; colors are linear Blender RGB values.
@@ -34,6 +37,17 @@ PRESET = {
         "neck_depth_reduction": 0.06,
         "neck_length_scale": 0.92,
     },
+    "identity": {"hair_style": "close_crop", "facial_hair": "moustache"},
+    "face": {
+        "head_width_scale": 1.0, "jaw_width_scale": 1.0, "cheek_fullness": 1.0,
+        "face_height_scale": 1.0, "face_depth_scale": 1.0,
+    },
+    "fit": {
+        "body_clearance": 0.004, "jacket_armhole_overlap": 0.028,
+        "cuff_overlap": 0.012, "waistcoat_clearance": 0.004,
+        "shirt_clearance": 0.002, "trouser_clearance": 0.004,
+        "shoe_foot_overlap": 0.006,
+    },
     "jacket": {
         "hip_half_width": 0.196,
         "waist_half_width": 0.174,
@@ -41,6 +55,7 @@ PRESET = {
         "shoulder_half_width": 0.180,
         "depth_scale": 0.92,
         "front_opening_angle": 0.42,
+        "front_style": "single_breasted",
         "collar_half_width": 0.067,
         "collar_depth": 0.048,
         "sleeve_shoulder_radius": 0.045,
@@ -88,6 +103,30 @@ PRESET = {
     },
 }
 
+# Parse and validate the complete selected profile before creating directories,
+# deleting scene objects, or touching any generated file.
+parser = argparse.ArgumentParser(description="Build the CASES seated negotiator")
+parser.add_argument("--persona", choices=("default", *PERSONA_IDS), default="default")
+script_args = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
+args = parser.parse_args(script_args)
+PERSONA_ID = args.persona
+PRESET = resolve_persona(PERSONA_ID, PRESET)
+validate_persona_parameters(PRESET)
+VARIANT_PATHS = variant_output_paths(ROOT, PERSONA_ID) if PERSONA_ID != "default" else None
+if VARIANT_PATHS:
+    GLB_PATH = VARIANT_PATHS["glb"]
+    BLEND_PATH = VARIANT_PATHS["blend"]
+    PREVIEW_OUTPUT = VARIANT_PATHS["render_dir"]
+else:
+    GLB_PATH = GODOT / "cases_suited_negotiator.glb"
+    BLEND_PATH = OUTPUT / "cases_suited_negotiator.blend"
+    PREVIEW_OUTPUT = V2_OUTPUT
+    OUTPUT.mkdir(parents=True, exist_ok=True)
+    V2_OUTPUT.mkdir(parents=True, exist_ok=True)
+GODOT.mkdir(parents=True, exist_ok=True)
+PREVIEW_OUTPUT.mkdir(parents=True, exist_ok=True)
+print("PERSONA:", PERSONA_ID)
+
 bpy.ops.object.select_all(action="SELECT")
 bpy.ops.object.delete(use_global=False)
 
@@ -134,6 +173,31 @@ for obj in list(bpy.data.objects):
     elif obj.type == "MESH" and obj.name in ("Eyes", "Eyebrows"):
         obj.data.materials.clear()
         obj.data.materials.append(eye_material if obj.name == "Eyes" else hair_material)
+
+
+def transform_attached_face_mesh(mesh_object, head_only=False):
+    """Map all retained head/face vertices through the shared landmark transform."""
+    head_group = next((group.index for group in mesh_object.vertex_groups if group.name == "Head"), None)
+    world = mesh_object.matrix_world.copy()
+    inverse = world.inverted()
+    for vertex in mesh_object.data.vertices:
+        point = world @ vertex.co
+        if not 1.58 <= point.z <= 1.81:
+            continue
+        if head_only:
+            head_weight = sum(assignment.weight for assignment in vertex.groups if assignment.group == head_group)
+            if head_weight < 0.20:
+                continue
+        mapped = transform_face_point(tuple(point), PRESET["face"])
+        vertex.co = inverse @ Vector(mapped)
+
+
+# Shape the source head and imported eyes/brows in the same coordinate space.
+# The extracted scalp and custom features below inherit this exact mapping.
+transform_attached_face_mesh(body, head_only=True)
+for obj in bpy.data.objects:
+    if obj.type == "MESH" and obj.name in ("Eyes", "Eyebrows"):
+        transform_attached_face_mesh(obj)
 
 
 def fit_base_proportions(mesh_object):
@@ -276,6 +340,12 @@ def torso_weights(z):
 
 
 JACKET = PRESET["jacket"]
+
+def offset_profile(profile, clearance):
+    """Offset a garment profile outward by its explicit fit clearance."""
+    return [(z, rx + clearance, ry + clearance, center_y) for z, rx, ry, center_y in profile]
+
+
 JACKET_PROFILE = [
     (0.995, JACKET["hip_half_width"] * 0.94, 0.112 * JACKET["depth_scale"], 0.030),
     (1.055, JACKET["hip_half_width"], 0.118 * JACKET["depth_scale"], 0.030),
@@ -289,14 +359,21 @@ JACKET_PROFILE = [
     (1.492, JACKET["collar_half_width"] * 1.48, 0.067 * JACKET["depth_scale"], 0.036),
     (1.505, JACKET["collar_half_width"], JACKET["collar_depth"], 0.036),
 ]
+JACKET_PROFILE = offset_profile(JACKET_PROFILE, PRESET["fit"]["body_clearance"])
 
 
 def scaled_profile(profile, width_scale, depth_scale):
     return [(z, rx * width_scale, ry * depth_scale, cy) for z, rx, ry, cy in profile]
 
 
-WAISTCOAT_PROFILE = scaled_profile(JACKET_PROFILE, PRESET["waistcoat"]["width_scale"], PRESET["waistcoat"]["depth_scale"])
-SHIRT_PROFILE = scaled_profile(JACKET_PROFILE, PRESET["shirt"]["width_scale"], PRESET["shirt"]["depth_scale"])
+WAISTCOAT_PROFILE = offset_profile(
+    scaled_profile(JACKET_PROFILE, PRESET["waistcoat"]["width_scale"], PRESET["waistcoat"]["depth_scale"]),
+    PRESET["fit"]["waistcoat_clearance"],
+)
+SHIRT_PROFILE = offset_profile(
+    scaled_profile(JACKET_PROFILE, PRESET["shirt"]["width_scale"], PRESET["shirt"]["depth_scale"]),
+    PRESET["fit"]["shirt_clearance"],
+)
 # Narrow the shirt's upper edge from the shoulder line into the neck opening.
 # This keeps the open-front jacket from revealing a broad, hollow shoulder ring.
 SHIRT_PROFILE = [row for row in SHIRT_PROFILE if row[0] <= 1.455]
@@ -358,8 +435,8 @@ def make_jacket_neck_yoke():
     faces = []
     for z, inner_x, inner_y in sections:
         outer_x, outer_y, center_y = profile_at(JACKET_PROFILE, z)
-        inner_x += 0.003
-        inner_y += 0.003
+        inner_x += PRESET["fit"]["body_clearance"]
+        inner_y += PRESET["fit"]["body_clearance"]
         for angular_index in range(angular_count + 1):
             angle = opening + angular_index * (2.0 * math.pi - 2.0 * opening) / angular_count
             for radial_index in range(radial_steps + 1):
@@ -401,7 +478,7 @@ def make_waistcoat():
         for z, inner, outer in rows:
             for column in range(subdivisions + 1):
                 x = side * (inner + (outer - inner) * column / subdivisions)
-                vertices.append((x, surface_y(WAISTCOAT_PROFILE, x, z, 0.004), z))
+                vertices.append((x, surface_y(WAISTCOAT_PROFILE, x, z, PRESET["fit"]["waistcoat_clearance"]), z))
                 weights.append(torso_weights(z))
         for row in range(len(rows) - 1):
             for column in range(subdivisions):
@@ -490,10 +567,12 @@ def arm_centerline(side, label):
     wrist = lower.tail_local.copy()
     lower_head = lower.head_local.copy()
     upper_axis = (elbow - upper.head_local).normalized()
-    sleeve_end = JACKET["sleeve_length"]
-    if not 0.80 < sleeve_end < 0.98:
-        raise ValueError("jacket.sleeve_length must end between 80% and 98% of the forearm")
-    root_inset = JACKET["sleeve_root_inset"]
+    sleeve_length = (wrist - lower_head).length
+    cuff_coverage = PRESET["cuff"]["length"] * 0.5 + PRESET["fit"]["cuff_overlap"]
+    sleeve_end = min(JACKET["sleeve_length"], 1.0 - cuff_coverage / max(sleeve_length, 1e-6))
+    if not 0.78 < sleeve_end < 0.98:
+        raise ValueError("jacket sleeve end must leave a fitted shirt-cuff reveal")
+    root_inset = JACKET["sleeve_root_inset"] + PRESET["fit"]["jacket_armhole_overlap"]
     path_points = [
         upper.head_local - upper_axis * root_inset,
         upper.head_local - upper_axis * (root_inset * 0.66),
@@ -513,20 +592,21 @@ def arm_centerline(side, label):
     elbow_radius = JACKET["sleeve_elbow_radius"]
     forearm_radius = JACKET["sleeve_forearm_radius"]
     wrist_radius = JACKET["sleeve_wrist_radius"]
+    cloth_clearance = PRESET["fit"]["body_clearance"]
     radii = [
-        shoulder_radius * JACKET["sleeve_root_ratio"],
-        shoulder_radius * 0.68,
-        shoulder_radius * 0.84,
-        shoulder_radius * 0.92,
-        shoulder_radius,
-        shoulder_radius,
-        shoulder_radius * 0.96,
-        elbow_radius * 1.05,
-        elbow_radius * 0.97,
-        forearm_radius * 1.12,
-        forearm_radius * 1.04,
-        wrist_radius * 1.08,
-        wrist_radius,
+        shoulder_radius * JACKET["sleeve_root_ratio"] + cloth_clearance,
+        shoulder_radius * 0.68 + cloth_clearance,
+        shoulder_radius * 0.84 + cloth_clearance,
+        shoulder_radius * 0.92 + cloth_clearance,
+        shoulder_radius + cloth_clearance,
+        shoulder_radius + cloth_clearance,
+        shoulder_radius * 0.96 + cloth_clearance,
+        elbow_radius * 1.05 + cloth_clearance,
+        elbow_radius * 0.97 + cloth_clearance,
+        forearm_radius * 1.12 + cloth_clearance,
+        forearm_radius * 1.04 + cloth_clearance,
+        wrist_radius * 1.08 + cloth_clearance,
+        wrist_radius + cloth_clearance,
     ]
     total_length = max(0.0001, sum((b - a).length for a, b in zip(path_points, path_points[1:])))
     traveled = 0.0
@@ -572,7 +652,8 @@ def make_cuff(label, lower_head, wrist):
     center = wrist - axis * half_length
     positions = [-half_length, -half_length * 0.72, half_length * 0.63, half_length]
     outer_radii = [radius * 0.96, radius, radius, radius * 0.95]
-    inner_radii = [value - 0.004 for value in outer_radii]
+    inner_clearance = PRESET["fit"]["body_clearance"]
+    inner_radii = [max(0.001, value - inner_clearance) for value in outer_radii]
     radial_count = 16
     vertices = []
     weights = []
@@ -617,7 +698,7 @@ def make_shirt_front():
     for z, half_width in rows:
         for column in range(subdivisions + 1):
             x = -half_width + 2.0 * half_width * column / subdivisions
-            vertices.append((x, surface_y(SHIRT_PROFILE, x, z, 0.004), z))
+            vertices.append((x, surface_y(SHIRT_PROFILE, x, z, PRESET["fit"]["shirt_clearance"]), z))
             weights.append(torso_weights(z))
     for row in range(len(rows) - 1):
         for column in range(subdivisions):
@@ -659,7 +740,7 @@ def make_lapels():
                     across = column / column_count
                     x = inner_x * (1.0 - across) + outer_x * across
                     z = inner_z * (1.0 - across) + outer_z * across
-                    vertices.append((side * x, surface_y(JACKET_PROFILE, side * x, z, 0.003), z))
+                    vertices.append((side * x, surface_y(JACKET_PROFILE, side * x, z, PRESET["fit"]["body_clearance"]), z))
                     weights.append(torso_weights(z))
             for row in range(row_count):
                 for column in range(column_count):
@@ -671,6 +752,40 @@ def make_lapels():
 
 
 lapels = make_lapels()
+
+
+def make_double_breasted_front():
+    """Add overlapping cloth front panels beneath the lapels on the senior coat."""
+    if JACKET["front_style"] != "double_breasted":
+        return []
+    row_widths = [(1.045, 0.145), (1.105, 0.158), (1.190, 0.162), (1.275, 0.165), (1.355, 0.155), (1.405, 0.128)]
+    overlap = 0.018
+    columns = 8
+    panels = []
+    for side in (-1.0, 1.0):
+        vertices, weights, faces = [], [], []
+        for row, (z, outer) in enumerate(row_widths):
+            if side < 0:
+                x0, x1 = -outer, overlap
+            else:
+                x0, x1 = -overlap, outer
+            for column in range(columns + 1):
+                t = column / columns
+                x = x0 + (x1 - x0) * t
+                overlap_depth = 0.002 if side < 0 else 0.004
+                front_clearance = PRESET["fit"]["body_clearance"] + overlap_depth
+                vertices.append((x, surface_y(JACKET_PROFILE, x, z, front_clearance), z))
+                weights.append(torso_weights(z))
+        for row in range(len(row_widths) - 1):
+            for column in range(columns):
+                a = row * (columns + 1) + column
+                b = a + columns + 1
+                faces.append((a, a + 1, b + 1, b))
+        panels.append(skinned("Double-breasted overlapping front " + ("left" if side < 0 else "right"), vertices, faces, weights, jacket_material, 0.002))
+    return panels
+
+
+double_breasted_panels = make_double_breasted_front()
 
 
 def make_shirt_collar():
@@ -760,12 +875,13 @@ def make_trouser(side, label):
         knee.lerp(ankle, 0.94),
         ankle,
     ]
+    clearance = PRESET["fit"]["trouser_clearance"]
     radii = [
-        settings["hip_radius"], settings["hip_radius"] * 0.98,
-        settings["thigh_radius"], settings["thigh_radius"] * 0.95,
-        settings["knee_radius"], settings["knee_radius"] * 0.99,
-        settings["calf_radius"], settings["calf_radius"] * 0.90,
-        settings["ankle_radius"] * 1.08, settings["ankle_radius"],
+        settings["hip_radius"] + clearance, settings["hip_radius"] * 0.98 + clearance,
+        settings["thigh_radius"] + clearance, settings["thigh_radius"] * 0.95 + clearance,
+        settings["knee_radius"] + clearance, settings["knee_radius"] * 0.99 + clearance,
+        settings["calf_radius"] + clearance, settings["calf_radius"] * 0.90 + clearance,
+        settings["ankle_radius"] * 1.08 + clearance, settings["ankle_radius"] + clearance,
     ]
     weights = [
         {"pelvis": 0.30, f"thigh_{label}": 0.70},
@@ -798,7 +914,7 @@ def make_shoe(label):
     settings = PRESET["shoe"]
     width_scale = settings["width_scale"]
     length_scale = settings["length_scale"]
-    positions = [-0.018, 0.0, 0.032, 0.067, 0.101, 0.136, 0.165, 0.185]
+    positions = [-0.018 - PRESET["fit"]["shoe_foot_overlap"], 0.0, 0.032, 0.067, 0.101, 0.136, 0.165, 0.185]
     widths = [0.031, 0.038, 0.043, 0.044, 0.043, 0.038, 0.030, 0.020]
     heights = [0.021, 0.027, 0.032, 0.033, 0.031, 0.027, 0.020, 0.010]
     vertices = []
@@ -863,10 +979,28 @@ def make_buttons():
         x = 0.035
         y = surface_y(WAISTCOAT_PROFILE, x, z, 0.010)
         uvball("Waistcoat brass button " + str(index + 1), (x, y, z), (0.006, 0.0035, 0.006), metal_material, torso_weights(z))
-    for index, x in enumerate((-0.142, 0.142)):
-        z = 1.095
-        y = surface_y(JACKET_PROFILE, x, z, 0.008)
-        uvball("Jacket front button " + str(index + 1), (x, y, z), (0.006, 0.0035, 0.006), metal_material, torso_weights(z))
+    if JACKET["front_style"] == "double_breasted":
+        for row, z in enumerate((1.145, 1.225, 1.305)):
+            for side in (-1.0, 1.0):
+                x = side * 0.085
+                side_label = "L" if side < 0 else "R"
+                panel_overlap_depth = 0.002 if side < 0 else 0.004
+                panel_y = surface_y(
+                    JACKET_PROFILE, x, z,
+                    PRESET["fit"]["body_clearance"] + panel_overlap_depth,
+                )
+                # Sink the button's back 1 mm into its matching front panel.
+                button_y = panel_y - 0.0015
+                uvball(
+                    f"Senior double-breasted button {row + 1}-{side_label}",
+                    (x, button_y, z), (0.006, 0.0025, 0.006),
+                    metal_material, torso_weights(z),
+                )
+    else:
+        for index, x in enumerate((-0.142, 0.142)):
+            z = 1.095
+            y = surface_y(JACKET_PROFILE, x, z, PRESET["fit"]["body_clearance"] + 0.008)
+            uvball("Jacket front button " + str(index + 1), (x, y, z), (0.006, 0.0035, 0.006), metal_material, torso_weights(z))
 
 
 make_buttons()
@@ -880,29 +1014,62 @@ tie_knot_faces = [(0, 1, 2, 3), (7, 6, 5, 4), (0, 4, 5, 1), (1, 5, 6, 2), (2, 6,
 skinned("Burgundy tie knot", tie_knot_vertices, tie_knot_faces, [torso_weights(1.435)] * len(tie_knot_vertices), tie_material, 0.001)
 
 
+def face_size(scale, profile):
+    return (
+        scale[0] * profile["head_width_scale"],
+        scale[1] * profile["face_depth_scale"],
+        scale[2] * profile["face_height_scale"],
+    )
+
+
+def face_surface_point(x, z):
+    mapped = transform_face_point((x, 0.0, z), PRESET["face"])
+    hit, location, _, _ = body.ray_cast(Vector((mapped[0], -0.30, mapped[2])), Vector((0.0, 1.0, 0.0)))
+    y = location.y - 0.002 if hit else -0.104
+    return (mapped[0], y, mapped[2])
+
+
 def make_hair_and_face():
+    hair_style = PRESET["identity"]["hair_style"]
+    if hair_style == "close_crop":
+        hairline = lambda center: 1.724 - 0.006 * math.exp(-((center.x + 0.035) / 0.026) ** 2)
+    elif hair_style == "receding_silver":
+        hairline = lambda center: 1.734 - 0.003 * math.exp(-((center.x + 0.035) / 0.026) ** 2)
+    elif hair_style == "side_part":
+        hairline = lambda center: 1.718 + 0.0035 * smoothstep((center.x + 0.12) / 0.24)
+    else:  # short_wavy
+        hairline = lambda center: 1.716 + 0.0012 * math.sin(center.x * 58.0)
     cut_from_body(
-        "Close-cropped gray hair",
-        lambda center: center.z > (1.724 - 0.006 * math.exp(-((center.x + 0.035) / 0.026) ** 2) if center.y < 0.0 else 1.724) and abs(center.x) < 0.15,
+        "Hair cap · " + hair_style,
+        lambda center: center.z > hairline(center) and abs(center.x) < 0.15,
         0.006,
         hair_material,
     )
     for side in (-1.0, 1.0):
-        uvball("Brown iris " + str(int(side)), (side * 0.024, -0.084, 1.699), (0.0075, 0.0032, 0.008), iris_material, {"Head": 1.0})
-        uvball("Pupil " + str(int(side)), (side * 0.024, -0.087, 1.699), (0.0035, 0.0018, 0.0045), pupil_material, {"Head": 1.0})
+        eye_center = transform_face_point((side * 0.024, -0.084, 1.699), PRESET["face"])
+        iris_scale = face_size((0.0075, 0.0032, 0.008), PRESET["face"])
+        pupil_center = transform_face_point((side * 0.024, -0.087, 1.699), PRESET["face"])
+        pupil_scale = face_size((0.0035, 0.0018, 0.0045), PRESET["face"])
+        uvball("Brown iris " + str(int(side)), eye_center, iris_scale, iris_material, {"Head": 1.0})
+        uvball("Pupil " + str(int(side)), pupil_center, pupil_scale, pupil_material, {"Head": 1.0})
 
-    moustache_outline = [
-        (-0.050, 1.639), (-0.041, 1.645), (-0.027, 1.648), (-0.014, 1.645),
-        (0.000, 1.640), (0.014, 1.645), (0.027, 1.648), (0.041, 1.645),
-        (0.050, 1.639), (0.040, 1.633), (0.027, 1.631), (0.014, 1.635),
-        (0.000, 1.637), (-0.014, 1.635), (-0.027, 1.631), (-0.040, 1.633),
-    ]
-    vertices = []
-    for x, z in moustache_outline:
-        hit, location, _, _ = body.ray_cast(Vector((x, -0.30, z)), Vector((0.0, 1.0, 0.0)))
-        y = location.y - 0.002 if hit else -0.104
-        vertices.append((x, y, z))
-    skinned("Contiguous close-set moustache", vertices, [tuple(range(len(vertices)))], [{"Head": 1.0}] * len(vertices), hair_material, 0.002)
+    facial_hair = PRESET["identity"]["facial_hair"]
+    if facial_hair == "moustache":
+        moustache_outline = [
+            (-0.050, 1.639), (-0.041, 1.645), (-0.027, 1.648), (-0.014, 1.645),
+            (0.000, 1.640), (0.014, 1.645), (0.027, 1.648), (0.041, 1.645),
+            (0.050, 1.639), (0.040, 1.633), (0.027, 1.631), (0.014, 1.635),
+            (0.000, 1.637), (-0.014, 1.635), (-0.027, 1.631), (-0.040, 1.633),
+        ]
+        vertices = [face_surface_point(x, z) for x, z in moustache_outline]
+        skinned("Contiguous close-set moustache", vertices, [tuple(range(len(vertices)))], [{"Head": 1.0}] * len(vertices), hair_material, 0.002)
+    elif facial_hair == "neat_beard":
+        # Extract the beard from the actual head surface so it follows the
+        # sculpt and Head weights instead of spanning it as a floating polygon.
+        def beard_region(center):
+            upper_edge = 1.635 - 0.12 * abs(center.x)
+            return center.y < -0.055 and 1.590 < center.z < upper_edge and abs(center.x) < 0.050
+        cut_from_body("Close-set scholarly beard", beard_region, 0.0025, hair_material, thickness=0.001)
 
 
 make_hair_and_face()
@@ -1114,7 +1281,7 @@ print("NLA", [(track.name, [strip.action.name for strip in track.strips]) for tr
 for track in rig.animation_data.nla_tracks:
     track.mute = False
 
-glb_path = GODOT / "cases_suited_negotiator.glb"
+glb_path = GLB_PATH
 bpy.ops.export_scene.gltf(
     filepath=str(glb_path),
     export_format="GLB",
@@ -1124,7 +1291,7 @@ bpy.ops.export_scene.gltf(
     export_yup=True,
 )
 print("EXPORTED", str(glb_path), glb_path.stat().st_size)
-bpy.ops.wm.save_as_mainfile(filepath=str(OUTPUT / "cases_suited_negotiator.blend"))
+bpy.ops.wm.save_as_mainfile(filepath=str(BLEND_PATH))
 print("SAVED BLEND")
 
 # Blender preview environment. None of these objects enter the exported GLB.
@@ -1165,7 +1332,9 @@ scene.world.color = (0.30, 0.30, 0.30)
 scene.view_settings.view_transform = "AgX"
 
 
-def render_view(filename, action, frame, location, target, lens=50, destination=V2_OUTPUT):
+def render_view(filename, action, frame, location, target, lens=50, destination=None):
+    if destination is None:
+        destination = PREVIEW_OUTPUT
     camera.location = location
     camera.rotation_euler = (Vector(target) - camera.location).to_track_quat("-Z", "Y").to_euler()
     camera.data.lens = lens
@@ -1182,23 +1351,30 @@ front = (0.0, -3.50, 1.32)
 three_quarter = (1.52, -3.18, 1.62)
 side_camera = (3.55, 0.10, 1.30)
 torso_target = (0.0, 0.29, 0.91)
-render_view("seated_idle_front.png", idle, 15, front, torso_target)
-render_view("seated_idle_three_quarter.png", idle, 15, three_quarter, torso_target)
-render_view("seated_idle_side.png", idle, 15, side_camera, torso_target)
-render_view("seated_talking_front.png", talking, 22, front, torso_target)
-render_view("seated_talking_three_quarter.png", talking, 22, three_quarter, torso_target)
-render_view("left_sleeve_detail.png", talking, 30, (0.62, -1.55, 1.12), (0.36, 0.12, 1.05), 56)
-render_view("right_sleeve_detail.png", talking, 22, (-0.62, -1.55, 1.13), (-0.36, 0.12, 1.05), 56)
-render_view("jacket_detail.png", idle, 15, (0.0, -2.16, 1.65), (0.0, 0.19, 1.36), 60)
-
-# Keep sampled talking frames for elbow/wrist inspection and iteration.
-frames_dir = V2_OUTPUT / "talking_frames"
-frames_dir.mkdir(parents=True, exist_ok=True)
-for frame in (1, 10, 22, 30, 45, 60):
-    render_view(f"talking_frame_{frame:02d}.png", talking, frame, front, torso_target, destination=frames_dir)
-
-# Preserve the original two-preview paths for existing project workflows.
-for filename, action, frame in (("seated_idle.png", idle, 15), ("seated_talking.png", talking, 22)):
-    render_view(filename, action, frame, three_quarter, torso_target, destination=OUTPUT)
-
-print("DONE: 65-bone suit GLB, editable blend and V2 visual review set")
+if PERSONA_ID == "default":
+    render_view("seated_idle_front.png", idle, 15, front, torso_target)
+    render_view("seated_idle_three_quarter.png", idle, 15, three_quarter, torso_target)
+    render_view("seated_idle_side.png", idle, 15, side_camera, torso_target)
+    render_view("seated_talking_front.png", talking, 22, front, torso_target)
+    render_view("seated_talking_three_quarter.png", talking, 22, three_quarter, torso_target)
+    render_view("left_sleeve_detail.png", talking, 30, (0.62, -1.55, 1.12), (0.36, 0.12, 1.05), 56)
+    render_view("right_sleeve_detail.png", talking, 22, (-0.62, -1.55, 1.13), (-0.36, 0.12, 1.05), 56)
+    render_view("jacket_detail.png", idle, 15, (0.0, -2.16, 1.65), (0.0, 0.19, 1.36), 60)
+    frames_dir = V2_OUTPUT / "talking_frames"
+    frames_dir.mkdir(parents=True, exist_ok=True)
+    for frame in (1, 10, 22, 30, 45, 60):
+        render_view(f"talking_frame_{frame:02d}.png", talking, frame, front, torso_target, destination=frames_dir)
+    for filename, action, frame in (("seated_idle.png", idle, 15), ("seated_talking.png", talking, 22)):
+        render_view(filename, action, frame, three_quarter, torso_target, destination=OUTPUT)
+else:
+    render_view("seated_idle_front.png", idle, 15, front, torso_target)
+    render_view("seated_idle_three_quarter.png", idle, 15, three_quarter, torso_target)
+    render_view("seated_idle_side.png", idle, 15, side_camera, torso_target)
+    render_view("seated_talking_front.png", talking, 22, front, torso_target)
+    render_view("talking_frame_22.png", talking, 22, front, torso_target)
+    render_view("talking_frame_30.png", talking, 30, front, torso_target)
+    render_view("left_sleeve_detail.png", talking, 30, (0.62, -1.55, 1.12), (0.36, 0.12, 1.05), 56)
+    render_view("right_sleeve_detail.png", talking, 22, (-0.62, -1.55, 1.13), (-0.36, 0.12, 1.05), 56)
+    render_view("jacket_detail.png", idle, 15, (0.0, -2.16, 1.65), (0.0, 0.19, 1.36), 60)
+    render_view("face_detail.png", idle, 15, (0.0, -2.00, 1.73), (0.0, -0.03, 1.69), 68)
+print("DONE:", PERSONA_ID, "65-bone suit GLB, editable blend and isolated review set")

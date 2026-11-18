@@ -1,0 +1,15 @@
+Legacy asset integrity proof (SHA-256)
+Created UTC: 2026-11-18 13:55:29
+quaternius_source_glb before: D6F3B64CAB629F6DDCA9BA063811AEFFD3663A8A4E49ADE47CD9505DC2BBD70F
+quaternius_source_glb after:  D6F3B64CAB629F6DDCA9BA063811AEFFD3663A8A4E49ADE47CD9505DC2BBD70F
+quaternius_source_glb unchanged: True
+default_blend before: 4767D666C51BF65CC5F7D67182157FC3CAE6B0499C8FE185629F201C3EEF6B96
+default_blend after:  4767D666C51BF65CC5F7D67182157FC3CAE6B0499C8FE185629F201C3EEF6B96
+default_blend unchanged: True
+default_godot_glb before: F26D54A2E99A61204560A5B1455A4FE6F6554F191D97C18269EF621F57570752
+default_godot_glb after:  F26D54A2E99A61204560A5B1455A4FE6F6554F191D97C18269EF621F57570752
+default_godot_glb unchanged: True
+Contact sheet: C:\Users\marcu\.codex\worktrees\historical-delegate-variants\Cases-GUI\art_source\output\v3\four_character_contact_sheet.png
+Godot version: 4.7.2.stable.official.ed1daf0bf
+Godot capture: C:\Users\marcu\.codex\worktrees\historical-delegate-variants\Cases-GUI\art_source\output\v3\godot_variant_lineup.png
+Blender/Godot comparison: C:\Users\marcu\.codex\worktrees\historical-delegate-variants\Cases-GUI\art_source\output\v3\four_character_blender_godot_comparison.png
