@@ -29,50 +29,56 @@ PRESET = {
         "torso_width_reduction": 0.10,
         "shoulder_width_reduction": 0.12,
         "arm_width_reduction": 0.04,
+        "neck_width_reduction": 0.10,
         "torso_depth_reduction": 0.08,
+        "neck_depth_reduction": 0.06,
     },
     "jacket": {
         "hip_half_width": 0.196,
-        "waist_half_width": 0.178,
-        "chest_half_width": 0.222,
-        "shoulder_half_width": 0.205,
+        "waist_half_width": 0.174,
+        "chest_half_width": 0.210,
+        "shoulder_half_width": 0.180,
         "depth_scale": 0.92,
-        "front_opening_angle": 0.68,
-        "sleeve_scale": 0.92,
+        "front_opening_angle": 0.42,
+        "collar_half_width": 0.076,
+        "collar_depth": 0.052,
+        "sleeve_shoulder_radius": 0.045,
+        "sleeve_elbow_radius": 0.036,
+        "sleeve_forearm_radius": 0.032,
+        "sleeve_wrist_radius": 0.024,
+        "sleeve_root_inset": 0.050,
+        "sleeve_root_ratio": 0.50,
+        "sleeve_length": 0.92,
         "lapel_width_scale": 0.90,
-        "sleeve_shoulder_radius": 0.074,
-        "sleeve_elbow_radius": 0.054,
-        "sleeve_forearm_radius": 0.043,
-        "sleeve_wrist_radius": 0.034,
     },
     "waistcoat": {"width_scale": 0.94, "depth_scale": 0.88},
     "shirt": {
-        "width_scale": 0.76,
-        "depth_scale": 0.72,
-        "neckline_half_width": 0.062,
-        "neckline_depth": 0.046,
+        "width_scale": 0.62,
+        "depth_scale": 0.64,
+        "neckline_half_width": 0.048,
+        "neckline_depth": 0.040,
     },
-    "cuff": {"diameter": 0.072, "length": 0.066},
+    "cuff": {"diameter": 0.048, "length": 0.034},
     "trousers": {
         "hip_radius": 0.078,
-        "thigh_radius": 0.073,
-        "knee_radius": 0.064,
-        "calf_radius": 0.056,
-        "ankle_radius": 0.044,
-        "depth_scale": 0.92,
+        "thigh_radius": 0.069,
+        "knee_radius": 0.058,
+        "calf_radius": 0.051,
+        "ankle_radius": 0.040,
+        "depth_scale": 0.86,
     },
     "shoe": {"length_scale": 0.96, "width_scale": 0.94, "heel_height": 0.012},
     "palette": {
         "jacket": (0.038, 0.055, 0.090),
-        "lapel": (0.070, 0.090, 0.132),
+        "lapel": (0.052, 0.068, 0.100),
         "trousers": (0.045, 0.064, 0.104),
-        "waistcoat": (0.055, 0.067, 0.090),
-        "shirt": (0.84, 0.81, 0.74),
-        "tie": (0.30, 0.040, 0.060),
+        "waistcoat": (0.065, 0.055, 0.043),
+        "shirt": (0.64, 0.62, 0.57),
+        "tie": (0.19, 0.027, 0.042),
         "metal": (0.56, 0.38, 0.15),
-        "leather": (0.065, 0.058, 0.052),
-        "hair": (0.19, 0.19, 0.18),
-        "skin": (0.66, 0.46, 0.34),
+        "leather": (0.105, 0.038, 0.018),
+        "hair": (0.105, 0.105, 0.095),
+        "skin": (0.60, 0.40, 0.29),
         "wood": (0.20, 0.092, 0.040),
         "chair": (0.20, 0.225, 0.15),
         "backdrop": (0.40, 0.41, 0.40),
@@ -102,10 +108,13 @@ waistcoat_material = make_material("Waistcoat · charcoal wool", COLORS["waistco
 shirt_material = make_material("Shirt · warm ivory cotton", COLORS["shirt"])
 tie_material = make_material("Tie · burgundy silk", COLORS["tie"], 0.36)
 metal_material = make_material("Buttons · antique brass", COLORS["metal"], 0.30, 0.45)
-leather_material = make_material("Shoes · polished charcoal leather", COLORS["leather"], 0.35)
+leather_material = make_material("Shoes · warm brown leather", COLORS["leather"], 0.50)
 sole_material = make_material("Shoe soles · black leather", (0.027, 0.024, 0.022), 0.70)
 hair_material = make_material("Hair · silvery gray", COLORS["hair"])
 skin_material = make_material("Visible skin · warm beige", COLORS["skin"])
+eye_material = make_material("Eyes · warm ivory", (0.78, 0.76, 0.69), 0.35)
+iris_material = make_material("Eyes · deep brown iris", (0.13, 0.065, 0.032), 0.28)
+pupil_material = make_material("Eyes · dark pupil", (0.012, 0.009, 0.008), 0.22)
 chair_wood = make_material("Chair · dark mahogany", COLORS["wood"], 0.48)
 chair_leather = make_material("Chair · olive green leather", COLORS["chair"], 0.68)
 
@@ -119,6 +128,9 @@ print("BASE:", body.name, "verts", len(body.data.vertices), "bones", len(rig.dat
 for obj in list(bpy.data.objects):
     if obj != body and obj != rig and obj.type == "MESH" and obj.name not in ("Eyes", "Eyebrows"):
         bpy.data.objects.remove(obj, do_unlink=True)
+    elif obj.type == "MESH" and obj.name in ("Eyes", "Eyebrows"):
+        obj.data.materials.clear()
+        obj.data.materials.append(eye_material if obj.name == "Eyes" else hair_material)
 
 
 def fit_base_proportions(mesh_object):
@@ -137,15 +149,18 @@ def fit_base_proportions(mesh_object):
         torso_weight = sum(influence.get(name, 0.0) for name in torso_bones)
         shoulder_weight = sum(influence.get(name, 0.0) for name in shoulder_bones)
         arm_weight = sum(influence.get(name, 0.0) for name in arm_bones)
+        neck_weight = influence.get("neck_01", 0.0)
         width_reduction = (
             body_parameters["torso_width_reduction"] * torso_weight
             + body_parameters["shoulder_width_reduction"] * shoulder_weight
             + body_parameters["arm_width_reduction"] * arm_weight
+            + body_parameters["neck_width_reduction"] * neck_weight
         )
         source = base.data[vertex.index].co
         target = correction.data[vertex.index].co
         target.x = source.x * max(0.82, 1.0 - width_reduction)
-        target.y = source.y * max(0.85, 1.0 - body_parameters["torso_depth_reduction"] * torso_weight)
+        depth_reduction = body_parameters["torso_depth_reduction"] * torso_weight + body_parameters["neck_depth_reduction"] * neck_weight
+        target.y = source.y * max(0.82, 1.0 - depth_reduction)
         target.z = source.z
     correction.value = 1.0
     mesh_object.active_shape_key_index = len(mesh_object.data.shape_keys.key_blocks) - 1
@@ -265,8 +280,11 @@ JACKET_PROFILE = [
     (1.220, JACKET["waist_half_width"], 0.123 * JACKET["depth_scale"], 0.030),
     (1.305, JACKET["chest_half_width"] * 0.94, 0.128 * JACKET["depth_scale"], 0.030),
     (1.390, JACKET["chest_half_width"], 0.132 * JACKET["depth_scale"], 0.030),
-    (1.455, JACKET["shoulder_half_width"], 0.124 * JACKET["depth_scale"], 0.034),
-    (1.495, 0.184, 0.095 * JACKET["depth_scale"], 0.036),
+    (1.430, JACKET["shoulder_half_width"] * 0.99, 0.121 * JACKET["depth_scale"], 0.032),
+    (1.455, JACKET["shoulder_half_width"] * 0.91, 0.115 * JACKET["depth_scale"], 0.034),
+    (1.475, JACKET["collar_half_width"] * 2.05, 0.088 * JACKET["depth_scale"], 0.035),
+    (1.492, JACKET["collar_half_width"] * 1.48, 0.067 * JACKET["depth_scale"], 0.036),
+    (1.505, JACKET["collar_half_width"], JACKET["collar_depth"], 0.036),
 ]
 
 
@@ -278,9 +296,9 @@ WAISTCOAT_PROFILE = scaled_profile(JACKET_PROFILE, PRESET["waistcoat"]["width_sc
 SHIRT_PROFILE = scaled_profile(JACKET_PROFILE, PRESET["shirt"]["width_scale"], PRESET["shirt"]["depth_scale"])
 # Narrow the shirt's upper edge from the shoulder line into the neck opening.
 # This keeps the open-front jacket from revealing a broad, hollow shoulder ring.
-SHIRT_PROFILE.pop()
+SHIRT_PROFILE = [row for row in SHIRT_PROFILE if row[0] <= 1.455]
 SHIRT_PROFILE.extend([
-    (1.478, 0.106, 0.066, 0.036),
+    (1.478, 0.068, 0.050, 0.036),
     (1.495, PRESET["shirt"]["neckline_half_width"], PRESET["shirt"]["neckline_depth"], 0.036),
 ])
 
@@ -338,8 +356,8 @@ def make_waistcoat():
         (1.105, 0.012, 0.182),
         (1.220, 0.013, 0.190),
         (1.315, 0.026, 0.190),
-        (1.382, 0.059, 0.176),
-        (1.420, 0.083, 0.158),
+        (1.382, 0.045, 0.176),
+        (1.420, 0.035, 0.158),
     ]
     subdivisions = 6
     for side in (-1.0, 1.0):
@@ -436,9 +454,12 @@ def arm_centerline(side, label):
     elbow = upper.tail_local.copy()
     wrist = lower.tail_local.copy()
     lower_head = lower.head_local.copy()
-    upper_length = (elbow - upper.head_local).length
-    lower_length = (wrist - lower_head).length
+    upper_axis = (elbow - upper.head_local).normalized()
+    sleeve_end = JACKET["sleeve_length"]
+    if not 0.80 < sleeve_end < 0.98:
+        raise ValueError("jacket.sleeve_length must end between 80% and 98% of the forearm")
     path_points = [
+        upper.head_local - upper_axis * JACKET["sleeve_root_inset"],
         upper.head_local.copy(),
         upper.head_local.lerp(elbow, 0.14),
         upper.head_local.lerp(elbow, 0.40),
@@ -447,15 +468,26 @@ def arm_centerline(side, label):
         lower_head.lerp(wrist, 0.24),
         lower_head.lerp(wrist, 0.52),
         lower_head.lerp(wrist, 0.79),
+        lower_head.lerp(wrist, sleeve_end),
         wrist,
     ]
-    shoulder_radius = JACKET["sleeve_shoulder_radius"] * JACKET["sleeve_scale"]
-    elbow_radius = JACKET["sleeve_elbow_radius"] * JACKET["sleeve_scale"]
-    forearm_radius = JACKET["sleeve_forearm_radius"] * JACKET["sleeve_scale"]
-    wrist_radius = JACKET["sleeve_wrist_radius"] * JACKET["sleeve_scale"]
-    radii = [shoulder_radius * 0.88, shoulder_radius, shoulder_radius * 0.97,
-             elbow_radius * 1.10, elbow_radius, forearm_radius * 1.14,
-             forearm_radius, forearm_radius * 0.88, wrist_radius]
+    shoulder_radius = JACKET["sleeve_shoulder_radius"]
+    elbow_radius = JACKET["sleeve_elbow_radius"]
+    forearm_radius = JACKET["sleeve_forearm_radius"]
+    wrist_radius = JACKET["sleeve_wrist_radius"]
+    radii = [
+        shoulder_radius * JACKET["sleeve_root_ratio"],
+        shoulder_radius * 0.72,
+        shoulder_radius * 0.84,
+        shoulder_radius,
+        shoulder_radius * 0.96,
+        elbow_radius * 1.05,
+        elbow_radius * 0.97,
+        forearm_radius * 1.12,
+        forearm_radius * 1.04,
+        wrist_radius * 1.08,
+        wrist_radius,
+    ]
     total_length = max(0.0001, sum((b - a).length for a, b in zip(path_points, path_points[1:])))
     traveled = 0.0
     normalized_distance = [0.0]
@@ -464,15 +496,15 @@ def arm_centerline(side, label):
         normalized_distance.append(traveled / total_length)
     weights = []
     for position in normalized_distance:
-        if position < 0.10:
-            t = position / 0.10
-            weights.append({f"clavicle_{label}": 0.15 * (1.0 - t), f"upperarm_{label}": 1.0 - 0.15 * (1.0 - t)})
-        elif position < 0.46:
+        if position < 0.20:
+            clavicle_weight = 0.50 * (1.0 - smoothstep(position / 0.20))
+            weights.append({f"clavicle_{label}": clavicle_weight, f"upperarm_{label}": 1.0 - clavicle_weight})
+        elif position < 0.40:
             weights.append({f"upperarm_{label}": 1.0})
-        elif position < 0.62:
-            t = smoothstep((position - 0.46) / 0.16)
+        elif position < 0.66:
+            t = smoothstep((position - 0.40) / 0.26)
             weights.append({f"upperarm_{label}": 1.0 - t, f"lowerarm_{label}": t})
-        elif position < 0.96:
+        elif position < 0.98:
             weights.append({f"lowerarm_{label}": 1.0})
         else:
             weights.append({f"lowerarm_{label}": 0.80, f"hand_{label}": 0.20})
@@ -484,10 +516,10 @@ def make_sleeve(side, label):
     jacket_points = points[:-1]
     jacket_radii = radii[:-1]
     jacket_weights = weights[:-1]
-    jacket_radii[0] = 0.012
-    # The jacket ends short of the wrist; the white cuff is nested into it.
+    # Fade the shoulder root into the jacket yoke rather than pinching it to a
+    # tiny cap, and run the cuff into the last 8% of the forearm.
     ring_limb("Suit sleeve " + label, jacket_points, jacket_radii, jacket_weights, jacket_material,
-              depth_scale=0.84, up_scale=1.08, thickness=0.002, close_start=True)
+              depth_scale=0.82, up_scale=0.88, thickness=0.002, close_start=True)
     make_cuff(label, lower_head, wrist)
 
 
@@ -560,20 +592,41 @@ make_shirt_front()
 
 def make_lapels():
     result = []
-    outlines = [
-        (0.193, 1.472),
-        (0.094, 1.427),
-        (0.132, 1.392),
-        (0.070, 1.325),
-        (0.150, 1.240),
-        (0.174, 1.342),
-        (0.151, 1.393),
+    panels = [
+        # Collar leaf, then the long chest lapel. Shared corners create a
+        # readable notch without a single large, folded n-gon.
+        ((0.056, 1.504), (0.156, 1.463), (0.136, 1.416), (0.094, 1.438)),
+        ((0.094, 1.438), (0.136, 1.416), (0.158, 1.312), (0.094, 1.274)),
     ]
     for side in (-1.0, 1.0):
-        scaled_outlines = [(x * JACKET["lapel_width_scale"], z) for x, z in outlines]
-        points = [(side * x, surface_y(JACKET_PROFILE, side * x, z, 0.006), z) for x, z in scaled_outlines]
-        weights = [torso_weights(z) for _, z in outlines]
-        result.append(skinned("05 · Notched jacket lapel " + str(int(side)), points, [tuple(range(len(points)))], weights, lapel_material, 0.003))
+        for panel_index, (inner_top, outer_top, outer_bottom, inner_bottom) in enumerate(panels):
+            inner_top = (inner_top[0] * JACKET["lapel_width_scale"], inner_top[1])
+            outer_top = (outer_top[0] * JACKET["lapel_width_scale"], outer_top[1])
+            outer_bottom = (outer_bottom[0] * JACKET["lapel_width_scale"], outer_bottom[1])
+            inner_bottom = (inner_bottom[0] * JACKET["lapel_width_scale"], inner_bottom[1])
+            row_count = 8
+            column_count = 4
+            vertices = []
+            weights = []
+            faces = []
+            for row in range(row_count + 1):
+                along = row / row_count
+                inner_x = inner_top[0] * (1.0 - along) + inner_bottom[0] * along
+                inner_z = inner_top[1] * (1.0 - along) + inner_bottom[1] * along
+                outer_x = outer_top[0] * (1.0 - along) + outer_bottom[0] * along
+                outer_z = outer_top[1] * (1.0 - along) + outer_bottom[1] * along
+                for column in range(column_count + 1):
+                    across = column / column_count
+                    x = inner_x * (1.0 - across) + outer_x * across
+                    z = inner_z * (1.0 - across) + outer_z * across
+                    vertices.append((side * x, surface_y(JACKET_PROFILE, side * x, z, 0.003), z))
+                    weights.append(torso_weights(z))
+            for row in range(row_count):
+                for column in range(column_count):
+                    a = row * (column_count + 1) + column
+                    b = a + column_count + 1
+                    faces.append((a, a + 1, b + 1, b))
+            result.append(skinned("05 · Notched jacket lapel " + str(int(side)) + " panel " + str(panel_index), vertices, faces, weights, lapel_material, 0.0015))
     return result
 
 
@@ -584,7 +637,7 @@ def make_shirt_collar():
     vertices = []
     weights = []
     faces = []
-    sections = [(1.504, 0.050, 0.042), (1.523, 0.048, 0.041), (1.541, 0.046, 0.039)]
+    sections = [(1.490, 0.060, 0.047), (1.505, 0.056, 0.044), (1.523, 0.050, 0.041), (1.541, 0.045, 0.038)]
     count = 20
     for z, rx, ry in sections:
         for column in range(count):
@@ -600,10 +653,10 @@ def make_shirt_collar():
     # Two short collar points wrap the tie knot and lie against the shirt front.
     for side in (-1.0, 1.0):
         points = [
-            (side * 0.047, -0.026, 1.511),
-            (side * 0.051, -0.060, 1.487),
-            (side * 0.022, -0.083, 1.454),
-            (side * 0.018, -0.066, 1.480),
+            (side * 0.035, -0.026, 1.512),
+            (side * 0.038, -0.048, 1.494),
+            (side * 0.018, -0.073, 1.466),
+            (side * 0.013, -0.059, 1.486),
         ]
         skinned("06 · Shirt collar point " + str(int(side)), points, [(0, 1, 2, 3)], [{"neck_01": 0.45, "spine_03": 0.55}] * 4, shirt_material, 0.002)
     return collar
@@ -617,12 +670,12 @@ def make_tie():
     weights = []
     faces = []
     tie_profile = [
-        (0.0, 1.454, -0.086),
-        (0.019, 1.430, -0.091),
-        (0.031, 1.388, -0.099),
-        (0.018, 1.360, -0.101),
-        (0.034, 1.178, -0.100),
-        (0.0, 1.137, -0.097),
+        (0.018, 1.425, -0.093),
+        (0.024, 1.402, -0.095),
+        (0.026, 1.375, -0.098),
+        (0.020, 1.345, -0.100),
+        (0.025, 1.195, -0.100),
+        (0.0, 1.163, -0.097),
     ]
     # A front face and shallow reverse face make the tie a fabric piece rather
     # than a zero-thickness triangle pasted onto the jacket.
@@ -706,8 +759,8 @@ def make_shoe(label):
     width_scale = settings["width_scale"]
     length_scale = settings["length_scale"]
     positions = [-0.018, 0.0, 0.032, 0.067, 0.101, 0.136, 0.165, 0.185]
-    widths = [0.031, 0.038, 0.043, 0.044, 0.041, 0.034, 0.024, 0.007]
-    heights = [0.021, 0.027, 0.032, 0.033, 0.030, 0.025, 0.018, 0.006]
+    widths = [0.031, 0.038, 0.043, 0.044, 0.043, 0.038, 0.030, 0.020]
+    heights = [0.021, 0.027, 0.032, 0.033, 0.031, 0.027, 0.020, 0.010]
     vertices = []
     weights = []
     faces = []
@@ -767,8 +820,9 @@ def uvball(name, position, scale, material, weights):
 
 def make_buttons():
     for index, z in enumerate((1.095, 1.166, 1.237, 1.308)):
-        y = surface_y(WAISTCOAT_PROFILE, 0.0, z, 0.010)
-        uvball("Waistcoat brass button " + str(index + 1), (0.0, y, z), (0.006, 0.0035, 0.006), metal_material, torso_weights(z))
+        x = 0.035
+        y = surface_y(WAISTCOAT_PROFILE, x, z, 0.010)
+        uvball("Waistcoat brass button " + str(index + 1), (x, y, z), (0.006, 0.0035, 0.006), metal_material, torso_weights(z))
     for index, x in enumerate((-0.142, 0.142)):
         z = 1.095
         y = surface_y(JACKET_PROFILE, x, z, 0.008)
@@ -776,17 +830,39 @@ def make_buttons():
 
 
 make_buttons()
+tie_knot_vertices = [
+    (-0.014, -0.103, 1.446), (0.014, -0.103, 1.446),
+    (0.019, -0.103, 1.425), (-0.019, -0.103, 1.425),
+    (-0.014, -0.097, 1.446), (0.014, -0.097, 1.446),
+    (0.019, -0.097, 1.425), (-0.019, -0.097, 1.425),
+]
+tie_knot_faces = [(0, 1, 2, 3), (7, 6, 5, 4), (0, 4, 5, 1), (1, 5, 6, 2), (2, 6, 7, 3), (3, 7, 4, 0)]
+skinned("Burgundy tie knot", tie_knot_vertices, tie_knot_faces, [torso_weights(1.435)] * len(tie_knot_vertices), tie_material, 0.001)
 
 
 def make_hair_and_face():
     cut_from_body(
         "Close-cropped gray hair",
-        lambda center: center.z > 1.724 and abs(center.x) < 0.15,
-        0.016,
+        lambda center: center.z > (1.724 - 0.006 * math.exp(-((center.x + 0.035) / 0.026) ** 2) if center.y < 0.0 else 1.724) and abs(center.x) < 0.15,
+        0.006,
         hair_material,
     )
     for side in (-1.0, 1.0):
-        uvball("Gray moustache " + str(int(side)), (side * 0.025, -0.094, 1.636), (0.027, 0.010, 0.006), hair_material, {"Head": 1.0})
+        uvball("Brown iris " + str(int(side)), (side * 0.024, -0.084, 1.699), (0.0075, 0.0032, 0.008), iris_material, {"Head": 1.0})
+        uvball("Pupil " + str(int(side)), (side * 0.024, -0.087, 1.699), (0.0035, 0.0018, 0.0045), pupil_material, {"Head": 1.0})
+
+    moustache_outline = [
+        (-0.050, 1.639), (-0.041, 1.645), (-0.027, 1.648), (-0.014, 1.645),
+        (0.000, 1.640), (0.014, 1.645), (0.027, 1.648), (0.041, 1.645),
+        (0.050, 1.639), (0.040, 1.633), (0.027, 1.631), (0.014, 1.635),
+        (0.000, 1.637), (-0.014, 1.635), (-0.027, 1.631), (-0.040, 1.633),
+    ]
+    vertices = []
+    for x, z in moustache_outline:
+        hit, location, _, _ = body.ray_cast(Vector((x, -0.30, z)), Vector((0.0, 1.0, 0.0)))
+        y = location.y - 0.002 if hit else -0.104
+        vertices.append((x, y, z))
+    skinned("Contiguous close-set moustache", vertices, [tuple(range(len(vertices)))], [{"Head": 1.0}] * len(vertices), hair_material, 0.002)
 
 
 make_hair_and_face()
