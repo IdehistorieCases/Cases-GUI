@@ -95,7 +95,7 @@ PERSONA_OVERRIDES: dict[str, dict[str, Any]] = {
     "senior_mediator": {
         "identity": {"hair_style": "receding_silver", "facial_hair": "clean_shaven"},
         "face": {"head_width_scale": 1.02, "jaw_width_scale": 1.10, "cheek_fullness": 1.04, "face_height_scale": 0.99, "face_depth_scale": 1.02},
-        "body": {"torso_width_reduction": 0.07, "shoulder_width_reduction": 0.13, "arm_width_reduction": 0.03, "torso_depth_reduction": 0.07},
+        "body": {"torso_width_reduction": 0.07, "shoulder_width_reduction": 0.16, "arm_width_reduction": 0.04, "torso_depth_reduction": 0.07},
         "jacket": {"hip_half_width": 0.202, "waist_half_width": 0.182, "chest_half_width": 0.218, "shoulder_half_width": 0.181, "front_style": "double_breasted", "fit_clearance": 0.005, "armhole_overlap": 0.028},
         "waistcoat": {"width_scale": 0.96, "depth_scale": 0.90, "fit_clearance": 0.004},
         "palette": _palette((0.055, 0.061, 0.071), (0.075, 0.081, 0.088), (0.055, 0.061, 0.071), (0.075, 0.095, 0.061), (0.12, 0.13, 0.075), (0.56, 0.54, 0.49), (0.60, 0.40, 0.29)),
@@ -103,8 +103,8 @@ PERSONA_OVERRIDES: dict[str, dict[str, Any]] = {
     "younger_envoy": {
         "identity": {"hair_style": "side_part", "facial_hair": "clean_shaven"},
         "face": {"head_width_scale": 0.96, "jaw_width_scale": 0.91, "cheek_fullness": 0.94, "face_height_scale": 1.03, "face_depth_scale": 0.94},
-        "body": {"torso_width_reduction": 0.10, "shoulder_width_reduction": 0.16, "arm_width_reduction": 0.07, "torso_depth_reduction": 0.10},
-        "jacket": {"hip_half_width": 0.190, "waist_half_width": 0.164, "chest_half_width": 0.199, "shoulder_half_width": 0.169, "front_style": "single_breasted", "fit_clearance": 0.004, "armhole_overlap": 0.024},
+        "body": {"torso_width_reduction": 0.10, "shoulder_width_reduction": 0.22, "arm_width_reduction": 0.10, "torso_depth_reduction": 0.10},
+        "jacket": {"hip_half_width": 0.190, "waist_half_width": 0.164, "chest_half_width": 0.199, "shoulder_half_width": 0.158, "sleeve_shoulder_radius": 0.041, "sleeve_elbow_radius": 0.034, "sleeve_forearm_radius": 0.030, "sleeve_wrist_radius": 0.023, "front_style": "single_breasted", "fit_clearance": 0.004, "armhole_overlap": 0.024},
         "waistcoat": {"width_scale": 0.91, "depth_scale": 0.85, "fit_clearance": 0.003},
         "palette": _palette((0.035, 0.060, 0.103), (0.050, 0.076, 0.122), (0.035, 0.060, 0.103), (0.080, 0.070, 0.054), (0.29, 0.12, 0.047), (0.12, 0.075, 0.045), (0.72, 0.52, 0.40)),
     },
@@ -112,7 +112,7 @@ PERSONA_OVERRIDES: dict[str, dict[str, Any]] = {
         "identity": {"hair_style": "short_wavy", "facial_hair": "neat_beard"},
         "face": {"head_width_scale": 1.00, "jaw_width_scale": 0.99, "cheek_fullness": 1.09, "face_height_scale": 0.98, "face_depth_scale": 1.04},
         "body": {"torso_width_reduction": 0.08, "shoulder_width_reduction": 0.14, "arm_width_reduction": 0.05, "torso_depth_reduction": 0.08},
-        "jacket": {"hip_half_width": 0.198, "waist_half_width": 0.173, "chest_half_width": 0.208, "shoulder_half_width": 0.177, "front_style": "single_breasted", "fit_clearance": 0.004, "armhole_overlap": 0.025},
+        "jacket": {"hip_half_width": 0.198, "waist_half_width": 0.173, "chest_half_width": 0.208, "shoulder_half_width": 0.174, "sleeve_shoulder_radius": 0.044, "sleeve_elbow_radius": 0.035, "sleeve_forearm_radius": 0.031, "sleeve_wrist_radius": 0.023, "front_style": "single_breasted", "fit_clearance": 0.004, "armhole_overlap": 0.025},
         "waistcoat": {"width_scale": 0.94, "depth_scale": 0.88, "fit_clearance": 0.003},
         "palette": _palette((0.075, 0.092, 0.060), (0.092, 0.111, 0.073), (0.075, 0.092, 0.060), (0.70, 0.65, 0.52), (0.17, 0.055, 0.052), (0.11, 0.075, 0.052), (0.68, 0.48, 0.36)),
     },
@@ -142,6 +142,9 @@ def validate_persona_parameters(preset: dict[str, Any]) -> None:
     """Reject malformed persona data before Blender scene or output mutation."""
     if not isinstance(preset, dict):
         raise ValueError("Persona preset must be a dictionary")
+    missing_sections = ALLOWED_SECTIONS - set(preset)
+    if missing_sections:
+        raise ValueError(f"Missing persona sections: {sorted(missing_sections)}")
     unknown_sections = set(preset) - ALLOWED_SECTIONS
     if unknown_sections:
         raise ValueError(f"Unknown persona sections: {sorted(unknown_sections)}")
@@ -151,6 +154,9 @@ def validate_persona_parameters(preset: dict[str, Any]) -> None:
         if not isinstance(values, dict):
             raise ValueError(f"{section} must be a dictionary")
         allowed = set(fields) | set(STYLE_FIELDS.get(section, {}))
+        missing = allowed - set(values)
+        if missing:
+            raise ValueError(f"Missing {section} parameters: {sorted(missing)}")
         unknown = set(values) - allowed
         if unknown:
             raise ValueError(f"Unknown {section} parameters: {sorted(unknown)}")
@@ -168,6 +174,9 @@ def validate_persona_parameters(preset: dict[str, Any]) -> None:
     identity = preset.get("identity", {})
     if not isinstance(identity, dict):
         raise ValueError("identity must be a dictionary")
+    missing_identity = set(STYLE_FIELDS["identity"]) - set(identity)
+    if missing_identity:
+        raise ValueError(f"Missing identity parameters: {sorted(missing_identity)}")
     unknown_identity = set(identity) - set(STYLE_FIELDS["identity"])
     if unknown_identity:
         raise ValueError(f"Unknown identity parameters: {sorted(unknown_identity)}")
@@ -178,6 +187,9 @@ def validate_persona_parameters(preset: dict[str, Any]) -> None:
     palette = preset.get("palette", {})
     if not isinstance(palette, dict):
         raise ValueError("palette must be a dictionary")
+    missing_colors = PALETTE_FIELDS - set(palette)
+    if missing_colors:
+        raise ValueError(f"Missing palette colors: {sorted(missing_colors)}")
     unknown_colors = set(palette) - PALETTE_FIELDS
     if unknown_colors:
         raise ValueError(f"Unknown palette colors: {sorted(unknown_colors)}")
