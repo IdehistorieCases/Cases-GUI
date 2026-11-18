@@ -1,5 +1,5 @@
-import bpy, json, pathlib
-root=pathlib.Path("D:/projects/cases-client/art_source")
+import bpy, pathlib
+root=pathlib.Path(__file__).resolve().parents[2] / "art_source"
 bpy.ops.object.select_all(action='SELECT');bpy.ops.object.delete(use_global=False)
 bpy.ops.import_scene.gltf(filepath=str(root/"vendor/quaternius/universal-base-character.glb"))
 def report(label):

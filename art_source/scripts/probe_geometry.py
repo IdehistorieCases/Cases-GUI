@@ -1,5 +1,6 @@
-import bpy,mathutils,pathlib
-p=pathlib.Path("D:/projects/cases-client/art_source/vendor/quaternius/universal-base-character.glb")
+import bpy, mathutils, pathlib
+root=pathlib.Path(__file__).resolve().parents[2]
+p=root/"art_source/vendor/quaternius/universal-base-character.glb"
 bpy.ops.import_scene.gltf(filepath=str(p))
 for o in bpy.data.objects:
  if o.type=="MESH":
