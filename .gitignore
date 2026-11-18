@@ -1,0 +1,9 @@
+.godot/
+*.blend1
+*.blend2
+__pycache__/
+*.py[cod]
+.DS_Store
+Thumbs.db
+art_source/output/*.blend1
+# Keep the edited Blender source and review renders; they're milestone deliverables.
