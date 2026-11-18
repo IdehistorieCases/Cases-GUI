@@ -35,7 +35,7 @@ The committed representative previews include the current contact sheet, front i
 
 ## Remaining limitations
 
-The sleeves now meet the jacket through the inspected idle and talking poses, though the low-poly shoulder silhouette is still somewhat rounded. The large source neck flaps and isolated pointed wrist pieces are absent in the reviewed frames. A narrow dark inner-collar seam and a visible low-poly transition at the back of the neck remain; the three-piece suit and face are still stylized. The Godot frame shows the full chair and character at the existing demo camera distance, so Blender close-ups remain the more useful view for garment detail. These results cover the saved animation samples, not every interpolated frame.
+The sleeves now meet the jacket through the inspected idle and talking poses, though the low-poly shoulder silhouette is still somewhat rounded. The large source neck flaps and isolated pointed wrist pieces are absent in the reviewed frames. The neck loft now bends forward under the jaw to close the head-to-neck gap; its overlap was reviewed in Blender's idle and talking close-ups and the rebuilt model was imported into the Godot room preview. A narrow dark inner-collar seam remains at the shirt, and the three-piece suit and face are still stylized. The Godot frame shows the full chair and character at the existing demo camera distance, so Blender close-ups remain the more useful view for garment detail. These results cover the saved animation samples, not every interpolated frame.
 
 ## V3 original delegate personas
 
