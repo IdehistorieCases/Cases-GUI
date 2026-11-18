@@ -32,6 +32,7 @@ PRESET = {
         "neck_width_reduction": 0.10,
         "torso_depth_reduction": 0.08,
         "neck_depth_reduction": 0.06,
+        "neck_length_scale": 0.92,
     },
     "jacket": {
         "hip_half_width": 0.196,
@@ -1036,10 +1037,15 @@ def make_neck():
     vertices = []
     weights = []
     faces = []
+    neck_midpoint = (sections[0][0] + sections[-1][0]) * 0.5
+    neck_length_scale = PRESET["body"]["neck_length_scale"]
+    if not 0.90 <= neck_length_scale <= 1.0:
+        raise ValueError("body.neck_length_scale must stay between 90% and 100%")
     for z, radius_x, radius_y, bone_weights in sections:
         for column in range(radial_count):
             angle = 2.0 * math.pi * column / radial_count
-            vertices.append((radius_x * math.sin(angle), 0.038 - radius_y * math.cos(angle), z))
+            adjusted_z = neck_midpoint + (z - neck_midpoint) * neck_length_scale
+            vertices.append((radius_x * math.sin(angle), 0.038 - radius_y * math.cos(angle), adjusted_z))
             weights.append(bone_weights)
     for row in range(len(sections) - 1):
         for column in range(radial_count):
