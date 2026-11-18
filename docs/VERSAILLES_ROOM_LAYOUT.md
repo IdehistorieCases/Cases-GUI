@@ -2,7 +2,7 @@
 
 ## Design intent
 
-A reusable, character-free formal diplomatic room in the project's 1 unit = 1 metre scale, using dark wood paneling, parquet, warm plaster, muted brass and an imported lantern chandelier. The room is a restrained period-inspired composition; it is not a reconstruction of a specific Versailles chamber. No flags, maps, portraits, or historical claims are added because the candidate references could not be verified.
+A reusable formal diplomatic room in the project's 1 unit = 1 metre scale, using dark wood paneling, parquet, warm plaster, muted brass and an imported lantern chandelier. One existing CASES negotiator character sits in its included chair at the west table position and starts the `SeatedIdle` animation. The room is a restrained period-inspired composition; it is not a reconstruction of a specific Versailles chamber. No flags, maps, portraits, or historical claims are added because the candidate references could not be verified.
 
 ## Dimensions and views
 
@@ -13,7 +13,7 @@ A reusable, character-free formal diplomatic room in the project's 1 unit = 1 me
 - Lighting: one warm directional source with soft ambient fill and one low-energy chandelier light; the scene remains within Godot's GL Compatibility renderer.
 - Interior overview: preview camera near (2.4, 2.0, 3.0), just inside the entry doors and looking diagonally across the table toward the rear windows and lantern.
 - Negotiation camera reference: preserve the existing demo camera offset of (1.8, 1.5, 2.85) and 43° FOV as a reference only. The main project has no Versailles negotiation camera or level to integrate with.
-- `ParticipantSeatAnchor_Template`: one empty marker at the west side of the table, facing toward the centre. It is an authoring template, not a one-seat scenario. Duplicate it only after a real participant layout is added.
+- `ParticipantSeatAnchor_Template`: marker at the west side of the table, facing toward the centre. The sample negotiator is placed at this transform. The scene demonstrates one occupant, not a one-seat scenario; duplicate or remove the sample only after a real participant layout is added.
 
 ## Furniture and asset use
 
@@ -21,11 +21,12 @@ A reusable, character-free formal diplomatic room in the project's 1 unit = 1 me
 - Use Vintage Wooden Drawer 01 against one side wall as a low storage cabinet.
 - Use Lantern Chandelier 01 centered under the ceiling.
 - Use Dark Paneled Wood on lower wall panels and Diagonal Parquet on the floor.
-- Do not place Green Chair 01 or Arm Chair 01 as room furniture: the current seated negotiator asset already includes a chair, and the repository has no participant count or seat layout. The scene exposes a marker template without embedding characters or chair duplication.
+- The sample negotiator uses the existing `cases_suited_negotiator.glb`, which includes its chair and `SeatedIdle` / `SeatedTalking` clips. No separate chair mesh is placed, so the chair cannot duplicate the character's own seat.
+- Green Chair 01 and Arm Chair 01 remain review alternatives. Do not add them beside the sample character unless its included chair is removed and an actual participant layout is chosen.
 - Exclude Vintage Cabinet 01 from runtime because of its 61k triangle count. Exclude the modern stationery, supplied landscape image, unverified flags/maps/art, and inaccessible Sketchfab sources.
 
 ## Scope and integration
 
-`godot/scenes/versailles_room.tscn` is a standalone reusable environment. It does not replace `res://scenes/seated_suit_demo.tscn`, which remains the project main scene. There is no existing Versailles level or browser-export preset in this repository, so this environment cannot be integrated into a scenario without a later scene-loading decision. The scene uses no character meshes, rig, animations, dialogue, AI, negotiation logic, or collision/navigation systems.
+`godot/scenes/versailles_room.tscn` is a standalone reusable environment with one sample seated actor. It does not replace `res://scenes/seated_suit_demo.tscn`, which remains the project main scene. There is no existing Versailles level or browser-export preset in this repository, so this environment cannot be integrated into a scenario without a later scene-loading decision. Apart from the sample actor's existing rig and idle clip, the room adds no dialogue, AI, negotiation logic, or collision/navigation systems.
 
 The comparison project under `assets/versailles/` is outside the main game project. Only the CC0 assets selected in `docs/ASSET_LICENSES.md` are copied to the main project's `godot/assets/versailles/optimized/` area.
