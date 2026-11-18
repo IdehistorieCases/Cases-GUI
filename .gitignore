@@ -7,3 +7,9 @@ __pycache__/
 Thumbs.db
 art_source/output/*.blend1
 # Keep the edited Blender source and review renders; they're milestone deliverables.
+godot/assets/versailles/review/
+assets/versailles/review/source_samples/polyhaven/
+assets/versailles/review/source_samples/quaternius/
+art_source/output/versailles_*.log
+art_source/output/versailles_*.wav
+art_source/output/versailles_*00000000.png
