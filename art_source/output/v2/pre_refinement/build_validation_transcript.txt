@@ -1,0 +1,44 @@
+**********************
+PowerShell transcript start
+Start time: 20261118095920
+Username: MARCUS_COMPUTER\marcu
+RunAs User: MARCUS_COMPUTER\marcu
+Configuration Name: 
+Machine: MARCUS_COMPUTER (Microsoft Windows NT 10.0.26200.0)
+Host Application: C:\Program Files\WindowsApps\OpenAI.CodexPrimaryRuntime.v26-1105-1297-0_26.1105.1297.0_x64__3k8sg7r9htsxt\dependencies\native\powershell\pwsh.dll -Command try { [Console]::OutputEncoding=[System.Text.Encoding]::UTF8 } catch {}
+$baselineDir = 'art_source\output\v2\pre_refinement'
+New-Item -ItemType Directory -Force -Path $baselineDir | Out-Null
+$baselineImages = @('comparison_contact_sheet.png','jacket_detail.png','left_sleeve_detail.png','right_sleeve_detail.png','seated_idle_front.png','seated_idle_side.png','seated_idle_three_quarter.png','seated_talking_front.png','seated_talking_three_quarter.png')
+foreach ($name in $baselineImages) { Copy-Item -LiteralPath (Join-Path 'art_source\output\v2' $name) -Destination (Join-Path $baselineDir $name) -Force }
+New-Item -ItemType Directory -Force -Path (Join-Path $baselineDir 'talking_frames') | Out-Null
+foreach ($frame in @(1,10,22,30,45,60)) { $name = 'talking_frame_{0:d2}.png' -f $frame; Copy-Item -LiteralPath (Join-Path 'art_source\output\v2\talking_frames' $name) -Destination (Join-Path $baselineDir 'talking_frames' $name) -Force }
+Copy-Item -LiteralPath 'docs\TEST_RESULTS.md' -Destination (Join-Path $baselineDir 'TEST_RESULTS.md') -Force
+Start-Transcript -LiteralPath (Join-Path $baselineDir 'build_validation_transcript.txt') -Force | Out-Null
+.\build_and_validate.ps1
+$buildExit = $LASTEXITCODE
+Stop-Transcript | Out-Null
+if ($buildExit -ne 0) { throw "Baseline build failed with exit code $buildExit" }
+Process ID: 7024
+PSVersion: 7.6.9
+PSEdition: Core
+GitCommitId: 7.6.9
+OS: Microsoft Windows 10.0.26200
+Platform: Win32NT
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1, 6.0, 7.0
+PSRemotingProtocolVersion: 2.4
+SerializationVersion: 1.1.0.1
+WSManStackVersion: 3.0
+**********************
+Building the procedural character with Blender: C:\Program Files\Blender Foundation\Blender 4.2\blender.exe
+
+Importing generated GLB into Godot: D:\tools\Godot-4.7.2\Godot_v4.7.2-stable_win64_console.exe
+
+Running animation, skinning, and proportion checks
+
+Starting the Compatibility-renderer demo headlessly
+
+CASES Suited Negotiator V2 build and validation PASS
+**********************
+PowerShell transcript end
+End time: 20261118095933
+**********************

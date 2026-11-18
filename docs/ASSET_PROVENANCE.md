@@ -23,6 +23,14 @@
 
 - The formal suit, shirt front, tie, collar, cuffs, chair, and procedural mesh generators were authored specifically for this CASES milestone using Blender Python.
 - No third-party finished historical suit meshes were copied.
+- V2 adds a jacket profile, bone-aligned sleeves and trousers, a layered waistcoat and shirt, modeled lapels, wrist cuffs, and foot-bound shoes. These are generator-authored geometry and introduce no additional source assets.
+- The generator adds an editable `CASES average-build correction` shape key to the imported source mesh without modifying the vendored file. The exported visible skin is limited to the head/neck and hands; procedural garment profiles define the visible dressed silhouette.
+
+## Base-character selection
+
+- The vendored `universal-base-character.glb` contains the `SuperHero_Male` character mesh and its compatible rig; it does not contain a regular-build male mesh to substitute.
+- V2 retains this base because the seated animations are bound to its matching skeleton. The corrective shape key is retained for source-mesh reuse; on this export the torso and arms are covered by generated suit meshes, whose profile parameters define the visible proportions.
+- The source `universal-animation-library.glb` supplies only `Sitting_Idle_Loop` and `Sitting_Talking_Loop` to the exported CASES GLB.
 
 ## Recommended future improvement
 

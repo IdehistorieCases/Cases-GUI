@@ -1,5 +1,5 @@
-import bpy,pathlib
-r=pathlib.Path("D:/projects/cases-client/art_source/vendor/quaternius")
+import bpy, pathlib
+r=pathlib.Path(__file__).resolve().parents[2]/"art_source/vendor/quaternius"
 bpy.ops.object.select_all(action='SELECT');bpy.ops.object.delete(use_global=False)
 bpy.ops.import_scene.gltf(filepath=str(r/'universal-base-character.glb'))
 base=next(o for o in bpy.data.objects if o.type=='ARMATURE')

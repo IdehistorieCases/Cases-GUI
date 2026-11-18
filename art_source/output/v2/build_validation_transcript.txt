@@ -1,0 +1,333 @@
+Building the procedural character with Blender: C:\Program Files\Blender Foundation\Blender 4.2\blender.exe
+TBBmalloc: skip allocation functions replacement in ucrtbase.dll: unknown prologue for function _msize
+10:45:59 | INFO: Data are loaded, start creating Blender stuff
+10:45:59 | INFO: Blender create Mesh node Face
+10:45:59 | INFO: Blender create Mesh node Face.001
+10:45:59 | INFO: Blender create Mesh node Sphere.005_Retopology.004
+10:45:59 | INFO: glTF import finished in 0.04s
+10:46:01 | INFO: Data are loaded, start creating Blender stuff
+10:46:01 | INFO: Blender create Mesh node Mannequin
+10:46:01 | INFO: glTF import finished in 0.48s
+10:46:02 | INFO: Starting glTF 2.0 export
+10:46:02 | INFO: Extracting primitive: 02 · Dress shirt body
+10:46:02 | INFO: Primitives created: 1
+10:46:02 | INFO: Extracting primitive: 03 · Tailored midnight jacket
+10:46:02 | INFO: Primitives created: 1
+10:46:02 | INFO: Extracting primitive: 04 · Buttoned charcoal waistcoat
+10:46:02 | INFO: Primitives created: 1
+10:46:02 | INFO: Extracting primitive: 05 · Notched jacket lapel -1 panel 0
+10:46:02 | INFO: Primitives created: 1
+10:46:02 | INFO: Extracting primitive: 05 · Notched jacket lapel -1 panel 1
+10:46:02 | INFO: Primitives created: 1
+10:46:02 | INFO: Extracting primitive: 05 · Notched jacket lapel 1 panel 0
+10:46:02 | INFO: Primitives created: 1
+10:46:02 | INFO: Extracting primitive: 05 · Notched jacket lapel 1 panel 1
+10:46:02 | INFO: Primitives created: 1
+10:46:02 | INFO: Extracting primitive: 06 · Shirt collar point -1
+10:46:02 | INFO: Primitives created: 1
+10:46:02 | INFO: Extracting primitive: 06 · Shirt collar point 1
+10:46:02 | INFO: Primitives created: 1
+10:46:02 | INFO: Extracting primitive: 06 · Turn-down shirt collar
+10:46:02 | INFO: Primitives created: 1
+10:46:02 | INFO: Extracting primitive: 07 · Burgundy necktie
+10:46:02 | INFO: Primitives created: 1
+10:46:02 | INFO: Extracting primitive: Sphere.006
+10:46:02 | INFO: Primitives created: 1
+10:46:02 | INFO: Extracting primitive: Sphere.008
+10:46:02 | INFO: Primitives created: 1
+10:46:02 | INFO: Extracting primitive: Burgundy tie knot
+10:46:02 | INFO: Primitives created: 1
+10:46:02 | INFO: Extracting primitive: Sphere.005_Retopology.001
+10:46:02 | WARNING: The active Vertex Color will not be exported, as it is not used in the node tree of the material
+10:46:02 | INFO: Primitives created: 1
+10:46:02 | INFO: Extracting primitive: Contiguous close-set moustache
+10:46:02 | INFO: Primitives created: 1
+10:46:02 | INFO: Extracting primitive: Dress shirt front
+10:46:02 | INFO: Primitives created: 1
+10:46:02 | INFO: Extracting primitive: Dress shoe sole l
+10:46:02 | INFO: Primitives created: 1
+10:46:02 | INFO: Extracting primitive: Dress shoe sole r
+10:46:02 | INFO: Primitives created: 1
+10:46:02 | INFO: Extracting primitive: Face
+10:46:02 | WARNING: The active Vertex Color will not be exported, as it is not used in the node tree of the material
+10:46:02 | INFO: Primitives created: 1
+10:46:02 | INFO: Extracting primitive: Face.001
+10:46:02 | WARNING: The active Vertex Color will not be exported, as it is not used in the node tree of the material
+10:46:02 | INFO: Primitives created: 1
+10:46:02 | INFO: Extracting primitive: Ivory shirt cuff l
+10:46:02 | INFO: Primitives created: 1
+10:46:02 | INFO: Extracting primitive: Ivory shirt cuff r
+10:46:02 | INFO: Primitives created: 1
+10:46:02 | INFO: Extracting primitive: Sphere.004
+10:46:02 | INFO: Primitives created: 1
+10:46:02 | INFO: Extracting primitive: Sphere.005
+10:46:02 | INFO: Primitives created: 1
+10:46:02 | INFO: Extracting primitive: Leather shoe l
+10:46:02 | INFO: Primitives created: 1
+10:46:02 | INFO: Extracting primitive: Leather shoe r
+10:46:02 | INFO: Primitives created: 1
+10:46:02 | INFO: Extracting primitive: Sphere.005_Retopology.004
+10:46:02 | WARNING: The active Vertex Color will not be exported, as it is not used in the node tree of the material
+10:46:02 | INFO: Primitives created: 1
+10:46:02 | INFO: Extracting primitive: Sphere.007
+10:46:02 | INFO: Primitives created: 1
+10:46:02 | INFO: Extracting primitive: Sphere.009
+10:46:02 | INFO: Primitives created: 1
+10:46:02 | INFO: Extracting primitive: Suit sleeve l
+10:46:02 | INFO: Primitives created: 1
+10:46:02 | INFO: Extracting primitive: Suit sleeve r
+10:46:02 | INFO: Primitives created: 1
+10:46:02 | INFO: Extracting primitive: Sphere
+10:46:02 | INFO: Primitives created: 1
+10:46:02 | INFO: Extracting primitive: Sphere.001
+10:46:02 | INFO: Primitives created: 1
+10:46:02 | INFO: Extracting primitive: Sphere.002
+10:46:02 | INFO: Primitives created: 1
+10:46:02 | INFO: Extracting primitive: Sphere.003
+10:46:02 | INFO: Primitives created: 1
+10:46:02 | INFO: Extracting primitive: Wool trousers l
+10:46:02 | INFO: Primitives created: 1
+10:46:02 | INFO: Extracting primitive: Wool trousers r
+10:46:02 | INFO: Primitives created: 1
+10:46:02 | INFO: Extracting primitive: Cube.001
+10:46:02 | INFO: Primitives created: 1
+10:46:02 | INFO: Extracting primitive: Cube.002
+10:46:02 | INFO: Primitives created: 1
+10:46:02 | INFO: Extracting primitive: Cube.003
+10:46:02 | INFO: Primitives created: 1
+10:46:02 | INFO: Extracting primitive: Cube.004
+10:46:02 | INFO: Primitives created: 1
+10:46:02 | INFO: Extracting primitive: Cube.005
+10:46:02 | INFO: Primitives created: 1
+10:46:02 | INFO: Extracting primitive: Cube.006
+10:46:02 | INFO: Primitives created: 1
+10:46:02 | INFO: Extracting primitive: Cube.007
+10:46:02 | INFO: Primitives created: 1
+10:46:02 | INFO: Extracting primitive: Cube.008
+10:46:02 | INFO: Primitives created: 1
+10:46:02 | INFO: Extracting primitive: Cube.009
+10:46:02 | INFO: Primitives created: 1
+10:46:02 | INFO: Extracting primitive: Cube.010
+10:46:02 | INFO: Primitives created: 1
+10:46:02 | INFO: Extracting primitive: Cube.011
+10:46:02 | INFO: Primitives created: 1
+10:46:02 | INFO: Extracting primitive: Cube.012
+10:46:02 | INFO: Primitives created: 1
+10:46:02 | INFO: Finished glTF 2.0 export in 0.49105358123779297 s
+Blender 4.2.2 LTS (hash c03d7d98a413 built 2024-09-24 01:17:42)
+Info: Total files 0 | Changed 0 | Failed 0
+Fra:15 Mem:82.43M (Peak 82.43M) | Time:00:00.29 | Rendering 1 / 48 samples
+Fra:15 Mem:82.43M (Peak 82.43M) | Time:00:00.39 | Rendering 25 / 48 samples
+Fra:15 Mem:82.44M (Peak 82.44M) | Time:00:00.49 | Rendering 48 / 48 samples
+Saved: 'D:\projects\Cases-GUI\art_source\output\v2\seated_idle_front.png'
+Time: 00:00.68 (Saving: 00:00.16)
+
+Fra:15 Mem:82.44M (Peak 82.44M) | Time:00:00.05 | Rendering 1 / 48 samples
+Fra:15 Mem:82.44M (Peak 82.44M) | Time:00:00.15 | Rendering 25 / 48 samples
+Fra:15 Mem:82.44M (Peak 82.44M) | Time:00:00.25 | Rendering 48 / 48 samples
+Saved: 'D:\projects\Cases-GUI\art_source\output\v2\seated_idle_three_quarter.png'
+Time: 00:00.36 (Saving: 00:00.08)
+
+Fra:15 Mem:82.44M (Peak 82.44M) | Time:00:00.05 | Rendering 1 / 48 samples
+Fra:15 Mem:82.44M (Peak 82.44M) | Time:00:00.15 | Rendering 25 / 48 samples
+Fra:15 Mem:82.44M (Peak 82.44M) | Time:00:00.25 | Rendering 48 / 48 samples
+Saved: 'D:\projects\Cases-GUI\art_source\output\v2\seated_idle_side.png'
+Time: 00:00.36 (Saving: 00:00.08)
+
+Fra:22 Mem:82.44M (Peak 82.44M) | Time:00:00.05 | Rendering 1 / 48 samples
+Fra:22 Mem:82.44M (Peak 82.44M) | Time:00:00.16 | Rendering 25 / 48 samples
+Fra:22 Mem:82.44M (Peak 82.44M) | Time:00:00.25 | Rendering 48 / 48 samples
+Saved: 'D:\projects\Cases-GUI\art_source\output\v2\seated_talking_front.png'
+Time: 00:00.36 (Saving: 00:00.08)
+
+Fra:22 Mem:82.44M (Peak 82.44M) | Time:00:00.06 | Rendering 1 / 48 samples
+Fra:22 Mem:82.44M (Peak 82.44M) | Time:00:00.17 | Rendering 25 / 48 samples
+Fra:22 Mem:82.44M (Peak 82.44M) | Time:00:00.27 | Rendering 48 / 48 samples
+Saved: 'D:\projects\Cases-GUI\art_source\output\v2\seated_talking_three_quarter.png'
+Time: 00:00.39 (Saving: 00:00.09)
+
+Fra:30 Mem:82.44M (Peak 82.44M) | Time:00:00.06 | Rendering 1 / 48 samples
+Fra:30 Mem:82.44M (Peak 82.44M) | Time:00:00.15 | Rendering 25 / 48 samples
+Fra:30 Mem:82.44M (Peak 82.44M) | Time:00:00.25 | Rendering 48 / 48 samples
+Saved: 'D:\projects\Cases-GUI\art_source\output\v2\left_sleeve_detail.png'
+Time: 00:00.35 (Saving: 00:00.08)
+
+Fra:22 Mem:82.44M (Peak 82.44M) | Time:00:00.05 | Rendering 1 / 48 samples
+Fra:22 Mem:82.44M (Peak 82.44M) | Time:00:00.15 | Rendering 25 / 48 samples
+Fra:22 Mem:82.44M (Peak 82.44M) | Time:00:00.24 | Rendering 48 / 48 samples
+Saved: 'D:\projects\Cases-GUI\art_source\output\v2\right_sleeve_detail.png'
+Time: 00:00.36 (Saving: 00:00.09)
+
+Fra:15 Mem:82.44M (Peak 82.44M) | Time:00:00.07 | Rendering 1 / 48 samples
+Fra:15 Mem:82.44M (Peak 82.44M) | Time:00:00.16 | Rendering 25 / 48 samples
+Fra:15 Mem:82.44M (Peak 82.44M) | Time:00:00.24 | Rendering 48 / 48 samples
+Saved: 'D:\projects\Cases-GUI\art_source\output\v2\jacket_detail.png'
+Time: 00:00.35 (Saving: 00:00.08)
+
+Fra:1 Mem:82.44M (Peak 82.44M) | Time:00:00.05 | Rendering 1 / 48 samples
+Fra:1 Mem:82.44M (Peak 82.44M) | Time:00:00.15 | Rendering 25 / 48 samples
+Fra:1 Mem:82.44M (Peak 82.44M) | Time:00:00.25 | Rendering 48 / 48 samples
+Saved: 'D:\projects\Cases-GUI\art_source\output\v2\talking_frames\talking_frame_01.png'
+Time: 00:00.36 (Saving: 00:00.08)
+
+Fra:10 Mem:82.44M (Peak 82.44M) | Time:00:00.05 | Rendering 1 / 48 samples
+Fra:10 Mem:82.44M (Peak 82.44M) | Time:00:00.15 | Rendering 25 / 48 samples
+Fra:10 Mem:82.44M (Peak 82.44M) | Time:00:00.25 | Rendering 48 / 48 samples
+Saved: 'D:\projects\Cases-GUI\art_source\output\v2\talking_frames\talking_frame_10.png'
+Time: 00:00.36 (Saving: 00:00.08)
+
+Fra:22 Mem:82.44M (Peak 82.44M) | Time:00:00.06 | Rendering 1 / 48 samples
+Fra:22 Mem:82.44M (Peak 82.44M) | Time:00:00.16 | Rendering 25 / 48 samples
+Fra:22 Mem:82.44M (Peak 82.44M) | Time:00:00.26 | Rendering 48 / 48 samples
+Saved: 'D:\projects\Cases-GUI\art_source\output\v2\talking_frames\talking_frame_22.png'
+Time: 00:00.38 (Saving: 00:00.08)
+
+Fra:30 Mem:82.44M (Peak 82.44M) | Time:00:00.05 | Rendering 1 / 48 samples
+Fra:30 Mem:82.44M (Peak 82.44M) | Time:00:00.15 | Rendering 25 / 48 samples
+Fra:30 Mem:82.44M (Peak 82.44M) | Time:00:00.25 | Rendering 48 / 48 samples
+Saved: 'D:\projects\Cases-GUI\art_source\output\v2\talking_frames\talking_frame_30.png'
+Time: 00:00.36 (Saving: 00:00.08)
+
+Fra:45 Mem:82.44M (Peak 82.44M) | Time:00:00.05 | Rendering 1 / 48 samples
+Fra:45 Mem:82.44M (Peak 82.44M) | Time:00:00.15 | Rendering 25 / 48 samples
+Fra:45 Mem:82.44M (Peak 82.44M) | Time:00:00.25 | Rendering 48 / 48 samples
+Saved: 'D:\projects\Cases-GUI\art_source\output\v2\talking_frames\talking_frame_45.png'
+Time: 00:00.36 (Saving: 00:00.08)
+
+Fra:60 Mem:82.44M (Peak 82.44M) | Time:00:00.06 | Rendering 1 / 48 samples
+Fra:60 Mem:82.44M (Peak 82.44M) | Time:00:00.16 | Rendering 25 / 48 samples
+Fra:60 Mem:82.44M (Peak 82.44M) | Time:00:00.26 | Rendering 48 / 48 samples
+Saved: 'D:\projects\Cases-GUI\art_source\output\v2\talking_frames\talking_frame_60.png'
+Time: 00:00.37 (Saving: 00:00.08)
+
+Fra:15 Mem:82.44M (Peak 82.44M) | Time:00:00.06 | Rendering 1 / 48 samples
+Fra:15 Mem:82.44M (Peak 82.44M) | Time:00:00.16 | Rendering 25 / 48 samples
+Fra:15 Mem:82.44M (Peak 82.44M) | Time:00:00.26 | Rendering 48 / 48 samples
+Saved: 'D:\projects\Cases-GUI\art_source\output\seated_idle.png'
+Time: 00:00.37 (Saving: 00:00.08)
+
+Fra:22 Mem:82.44M (Peak 82.44M) | Time:00:00.05 | Rendering 1 / 48 samples
+Fra:22 Mem:82.44M (Peak 82.44M) | Time:00:00.16 | Rendering 25 / 48 samples
+Fra:22 Mem:82.44M (Peak 82.44M) | Time:00:00.25 | Rendering 48 / 48 samples
+Saved: 'D:\projects\Cases-GUI\art_source\output\seated_talking.png'
+Time: 00:00.36 (Saving: 00:00.08)
+
+BASE: OriginalQuaterniusBody verts 7281 bones 65
+BODY CORRECTION: CASES average-build correction value 1.0
+TAILORED 03 · Tailored midnight jacket 363 320
+TAILORED 02 · Dress shirt body 240 216
+TAILORED 04 · Buttoned charcoal waistcoat 84 60
+TAILORED Suit sleeve l 161 160
+TAILORED Ivory shirt cuff l 128 128
+TAILORED Suit sleeve r 161 160
+TAILORED Ivory shirt cuff r 128 128
+TAILORED Dress shirt front 28 18
+TAILORED 05 · Notched jacket lapel -1 panel 0 45 32
+TAILORED 05 · Notched jacket lapel -1 panel 1 45 32
+TAILORED 05 · Notched jacket lapel 1 panel 0 45 32
+TAILORED 05 · Notched jacket lapel 1 panel 1 45 32
+TAILORED 06 · Turn-down shirt collar 80 60
+TAILORED 06 · Shirt collar point -1 4 1
+TAILORED 06 · Shirt collar point 1 4 1
+TAILORED 07 · Burgundy necktie 24 22
+TAILORED Wool trousers l 162 176
+TAILORED Wool trousers r 162 176
+TAILORED Leather shoe l 96 84
+TAILORED Dress shoe sole l 96 84
+TAILORED Leather shoe r 96 84
+TAILORED Dress shoe sole r 96 84
+TAILORED Burgundy tie knot 8 6
+GARMENT Close-cropped gray hair verts 259 polys 400
+TAILORED Contiguous close-set moustache 16 1
+NLA [('SeatedIdle', ['Sitting_Idle_Loop_Armature']), ('SeatedTalking', ['Sitting_Talking_Loop_Armature'])]
+INFO Draco mesh compression is available, use library at C:\Program Files\Blender Foundation\Blender 4.2\4.2\python\lib\site-packages\extern_draco.dll
+
+EXPORTED D:\projects\Cases-GUI\godot\assets\characters\cases_suited_negotiator.glb 1153688
+Info: Saved "cases_suited_negotiator.blend"
+SAVED BLEND
+RENDERED D:\projects\Cases-GUI\art_source\output\v2\seated_idle_front.png
+RENDERED D:\projects\Cases-GUI\art_source\output\v2\seated_idle_three_quarter.png
+RENDERED D:\projects\Cases-GUI\art_source\output\v2\seated_idle_side.png
+RENDERED D:\projects\Cases-GUI\art_source\output\v2\seated_talking_front.png
+RENDERED D:\projects\Cases-GUI\art_source\output\v2\seated_talking_three_quarter.png
+RENDERED D:\projects\Cases-GUI\art_source\output\v2\left_sleeve_detail.png
+RENDERED D:\projects\Cases-GUI\art_source\output\v2\right_sleeve_detail.png
+RENDERED D:\projects\Cases-GUI\art_source\output\v2\jacket_detail.png
+RENDERED D:\projects\Cases-GUI\art_source\output\v2\talking_frames\talking_frame_01.png
+RENDERED D:\projects\Cases-GUI\art_source\output\v2\talking_frames\talking_frame_10.png
+RENDERED D:\projects\Cases-GUI\art_source\output\v2\talking_frames\talking_frame_22.png
+RENDERED D:\projects\Cases-GUI\art_source\output\v2\talking_frames\talking_frame_30.png
+RENDERED D:\projects\Cases-GUI\art_source\output\v2\talking_frames\talking_frame_45.png
+RENDERED D:\projects\Cases-GUI\art_source\output\v2\talking_frames\talking_frame_60.png
+RENDERED D:\projects\Cases-GUI\art_source\output\seated_idle.png
+RENDERED D:\projects\Cases-GUI\art_source\output\seated_talking.png
+DONE: 65-bone suit GLB, editable blend and V2 visual review set
+
+Blender quit
+Importing generated GLB into Godot: D:\tools\Godot-4.7.2\Godot_v4.7.2-stable_win64_console.exe
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+[   0% ] [90m[1mfirst_scan_filesystem[22m | Started Project initialization (5 steps)[39m[0m
+[   0% ] [90m[1mfirst_scan_filesystem[22m | Scanning file structure...[39m[0m
+[  16% ] [90m[1mfirst_scan_filesystem[22m | Loading global class names...[39m[0m
+[  33% ] [90m[1mfirst_scan_filesystem[22m | Verifying GDExtensions...[39m[0m
+[  50% ] [90m[1mfirst_scan_filesystem[22m | Creating autoload scripts...[39m[0m
+[  66% ] [90m[1mfirst_scan_filesystem[22m | Initializing plugins...[39m[0m
+[  83% ] [90m[1mfirst_scan_filesystem[22m | Starting file scan...[39m[0m
+[92m[ DONE ][39m [1mfirst_scan_filesystem[22m
+[0m
+[   0% ] [90m[1mreimport[22m | Started (Re)Importing Assets (1 steps)[39m[0m
+[   0% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[   0% ] [90m[1mreimport[22m | Executing pre-reimport operations...[39m[0m
+[   0% ] [90m[1mpreload_reimporting_scene[22m | Started Preparing scenes for reload (1 steps)[39m[0m
+[   0% ] [90m[1mpreload_reimporting_scene[22m | Analyzing scene [empty][39m[0m
+[  50% ] [90m[1mpreload_reimporting_scene[22m | Preparation done.[39m[0m
+[92m[ DONE ][39m [1mpreload_reimporting_scene[22m
+[0m
+[   0% ] [90m[1mreimport[22m | cases_suited_negotiator.glb[39m[0m
+[   0% ] [90m[1mimport[22m | Started Import Scene (104 steps)[39m[0m
+[   0% ] [90m[1mimport[22m | Importing Scene...[39m[0m
+[   1% ] [90m[1mimport[22m | Running Custom Script...[39m[0m
+[  99% ] [90m[1mimport[22m | Saving...[39m[0m
+[92m[ DONE ][39m [1mimport[22m
+[0m
+[  50% ] [90m[1mreimport[22m | Finalizing Asset Import...[39m[0m
+[92m[ DONE ][39m [1mreimport[22m
+[0m
+[   0% ] [90m[1mreimport[22m | Started (Re)Importing Assets (1 steps)[39m[0m
+[   0% ] [90m[1mreimport[22m | Executing post-reimport operations...[39m[0m
+[92m[ DONE ][39m [1mreimport[22m
+[0m
+[   0% ] [90m[1mloading_editor_layout[22m | Started Loading editor (5 steps)[39m[0m
+[   0% ] [90m[1mloading_editor_layout[22m | Loading editor layout...[39m[0m
+[  16% ] [90m[1mloading_editor_layout[22m | Loading docks...[39m[0m
+[92m[ DONE ][39m [1mloading_editor_layout[22m
+[0m
+Running animation, skinning, and proportion checks
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+CASES Godot imported skeleton bones: 65
+CASES Godot animation names: ["SeatedIdle", "SeatedTalking"]
+CASES skinned meshes / weighted surfaces: 38 / 38
+CASES sampled 7 frames from SeatedIdle (1.66666662693024 sec)
+CASES sampled 7 frames from SeatedTalking (2.91666674613953 sec)
+CASES pelvis idle / talking: 0.58353006839752 / 0.58353006839752
+CASES VALIDATION PASS
+Starting the Compatibility-renderer demo headlessly
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+CASES loaded animations: ["SeatedIdle", "SeatedTalking"]
+Capturing a Compatibility-renderer demo frame with Godot Movie Maker
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 3.3.0 NVIDIA 610.88 - Compatibility - Using Device: NVIDIA - NVIDIA GeForce RTX 3060
+
+Movie Maker mode enabled, recording movie in 1152×648 @ 30 FPS...
+CASES loaded animations: ["SeatedIdle", "SeatedTalking"]
+--------------------------------------------------------------------------------
+Done recording movie at path: D:\projects\Cases-GUI\art_source\output\v2\godot_engine_capture.png
+1 frames at 30 FPS (movie length: 00:00:00:01), recorded in 00:00:00 (100% of real-time speed).
+CPU render time: 0.00 seconds (average: 0.47 ms/frame)
+GPU render time: 0.00 seconds (average: 0.00 ms/frame)
+Encoding time: 0.02 seconds (average: 19.21 ms/frame)
+--------------------------------------------------------------------------------
+CASES Suited Negotiator V2 build and validation PASS
