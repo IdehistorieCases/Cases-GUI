@@ -981,10 +981,21 @@ def make_buttons():
         uvball("Waistcoat brass button " + str(index + 1), (x, y, z), (0.006, 0.0035, 0.006), metal_material, torso_weights(z))
     if JACKET["front_style"] == "double_breasted":
         for row, z in enumerate((1.145, 1.225, 1.305)):
-            for column, side in enumerate((-1.0, 1.0)):
+            for side in (-1.0, 1.0):
                 x = side * 0.085
-                y = surface_y(JACKET_PROFILE, x, z, PRESET["fit"]["body_clearance"] + 0.011)
-                uvball(f"Senior double-breasted button {row + 1}-{column + 1}", (x, y, z), (0.007, 0.004, 0.007), metal_material, torso_weights(z))
+                side_label = "L" if side < 0 else "R"
+                panel_overlap_depth = 0.002 if side < 0 else 0.004
+                panel_y = surface_y(
+                    JACKET_PROFILE, x, z,
+                    PRESET["fit"]["body_clearance"] + panel_overlap_depth,
+                )
+                # Sink the button's back 1 mm into its matching front panel.
+                button_y = panel_y - 0.0015
+                uvball(
+                    f"Senior double-breasted button {row + 1}-{side_label}",
+                    (x, button_y, z), (0.006, 0.0025, 0.006),
+                    metal_material, torso_weights(z),
+                )
     else:
         for index, x in enumerate((-0.142, 0.142)):
             z = 1.095
