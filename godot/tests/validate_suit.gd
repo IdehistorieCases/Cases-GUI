@@ -11,7 +11,11 @@ const REQUIRED_ANIMATED_BONES_BY_CLIP := {
     "SeatedIdle": ["Head", "neck_01", "spine_03", "clavicle_l", "clavicle_r", "upperarm_l", "upperarm_r", "lowerarm_l", "lowerarm_r", "hand_l", "hand_r"],
     "SeatedTalking": ["Head", "neck_01", "spine_03", "clavicle_l", "clavicle_r", "upperarm_l", "upperarm_r", "lowerarm_l", "lowerarm_r", "hand_l", "hand_r"],
 }
-const SAMPLE_FRACTIONS := [0.0, 0.2, 0.4, 0.6, 0.8, 0.98, 1.0]
+const SAMPLE_FRACTIONS := [
+    0.0, 0.0714286, 0.1428571, 0.2142857, 0.2857143,
+    0.3571429, 0.4285714, 0.5, 0.5714286, 0.6428571,
+    0.7142857, 0.7857143, 0.8571429, 0.9285714, 1.0,
+]
 
 func _initialize() -> void:
     call_deferred("_run_checks")
@@ -80,9 +84,15 @@ func validate_character(asset_path: String) -> Dictionary:
 func _check_meshes(model: Node, skeleton: Skeleton3D, result: Dictionary) -> void:
     var meshes: Array[MeshInstance3D] = []
     _collect_meshes(model, meshes)
+    var retained_source_body := false
+    var is_default_character: bool = str(result["path"]).ends_with("cases_suited_negotiator.glb")
     for mesh_node in meshes:
         if mesh_node.name.begins_with("Chair"):
             continue
+        if mesh_node.name == "OriginalQuaterniusBody":
+            retained_source_body = true
+        if is_default_character and mesh_node.name.to_lower().contains("anatomical neck transition"):
+            _fail(result, "Replacement neck loft is still rendered alongside the Quaternius source mesh")
         var mesh := mesh_node.mesh
         var bound_skeleton := mesh_node.get_node_or_null(mesh_node.skeleton) as Skeleton3D
         if mesh_node.skin == null or bound_skeleton != skeleton:
@@ -138,6 +148,8 @@ func _check_meshes(model: Node, skeleton: Skeleton3D, result: Dictionary) -> voi
             if maxf(bounds.x, bounds.z) >= 0.24:
                 _fail(result, "Dress shoe is oversized: " + mesh_node.name + " " + str(bounds))
 
+    if is_default_character and not retained_source_body:
+        _fail(result, "Original Quaternius head skin is missing")
     if result["skinned_mesh_count"] < 15 or result["weighted_surface_count"] < 15:
         _fail(result, "Expected all character and garment meshes to carry normalized skin weights")
     if result["sleeve_count"] != 2 or result["cuff_count"] != 2 or result["trouser_count"] != 2 or result["shoe_count"] != 2:
@@ -178,7 +190,8 @@ func _check_animations(player: AnimationPlayer, skeleton: Skeleton3D, model: Nod
                         changed_bones[bone_name] = true
             if model.transform.origin.distance_to(initial_root.origin) > 0.0001 or not model.transform.basis.is_equal_approx(initial_root.basis):
                 _fail(result, "Character root moved during " + clip)
-            if pelvis_index >= 0 and is_equal_approx(SAMPLE_FRACTIONS[sample_index], 0.4):
+            var pelvis_sample_index := int(round(0.4 * float(SAMPLE_FRACTIONS.size() - 1)))
+            if pelvis_index >= 0 and sample_index == pelvis_sample_index:
                 pelvis_by_clip[clip] = skeleton.get_bone_global_pose(pelvis_index).origin.y
         var clip_passed: Array[String] = []
         for bone_name in required_bones:
