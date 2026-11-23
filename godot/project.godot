@@ -10,8 +10,8 @@ config_version=5
 
 [application]
 
-config/name="CASES — Suited Negotiator Prototype"
-run/main_scene="res://scenes/seated_suit_demo.tscn"
+config/name="CASES — Paris 1919"
+run/main_scene="res://scenes/game_client.tscn"
 config/features=PackedStringArray("4.7")
 
 [editor_plugins]

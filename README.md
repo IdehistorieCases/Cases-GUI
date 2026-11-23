@@ -1,6 +1,6 @@
 # CASES-GUI — Suited Negotiator V2
 
-CASES is an educational 3D negotiation game. This repository contains the Godot 4 character prototype and its reproducible Blender asset pipeline. The separate FastAPI backend and Local-AI-API-LITE are not part of this repository.
+CASES is an educational 3D negotiation game. This repository contains the Godot 4 client and reproducible Blender asset pipeline. The FastAPI backend and Local-AI-API-LITE remain separate deployments; the default Godot scene now connects to their existing session API.
 
 ## Character pipeline
 
@@ -16,17 +16,19 @@ Every persona profile is validated before the generator edits the Blender scene 
 
 Face shape is applied through one `transform_face_point()` mapping shared by the head surface and attached hair, eye, brow, pupil, and facial-hair landmarks. The senior mediator uses two overlapping, skinned jacket fronts with two columns of buttons for a double-breasted construction.
 
-## Open the demo
+## Run the Godot client
 
-Project directory: `D:\projects\Cases-GUI\godot`
+From the repository root, open `godot/project.godot` in Godot 4.7.2 and run the main scene. The main scene connects to the backend at `http://127.0.0.1:18081`; start the backend deployment first. The endpoint is editable in the client, or can be set with `CASES_API_BASE_URL`. Use HTTPS for remote backends.
 
-Open `godot/project.godot` in Godot 4.7.2 and run the main scene.
+The first connected flow loads the Versailles scenario, opens or resumes a session, displays the backend-generated opening, and sends Danish text turns. Current scope is one scenario, one fixed British role, and text input. See [the integration guide](docs/GODOT_BACKEND_INTEGRATION.md) for endpoints, session recovery, and limits.
+
+The standalone seated actor preview remains available at `res://scenes/seated_suit_demo.tscn`. Its animation controls are:
 
 - `1`: seated idle
 - `2`: seated talking
 - `3`: pause or resume
 
-The demo remains a single seated actor and chair. It does not include multi-participant placement, backend integration, or dialogue systems.
+This preview is a single seated actor and chair; it remains useful independently of the connected game client.
 
 ## Rebuild and validate
 
