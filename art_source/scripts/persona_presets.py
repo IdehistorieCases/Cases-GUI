@@ -33,7 +33,6 @@ DIMENSION_LIMITS: dict[str, dict[str, tuple[float, float]]] = {
         "neck_width_reduction": (0.0, 0.25),
         "torso_depth_reduction": (0.0, 0.25),
         "neck_depth_reduction": (0.0, 0.25),
-        "neck_length_scale": (0.85, 1.05),
     },
     "jacket": {
         "hip_half_width": (0.14, 0.25), "waist_half_width": (0.13, 0.23),

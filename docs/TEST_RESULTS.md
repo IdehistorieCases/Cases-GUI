@@ -6,7 +6,7 @@ Recorded 18 November 2026 on Windows with Blender 4.2.2 and Godot 4.7.2 stable. 
 
 The Quaternius `SuperHero_Male` source and its 65-bone humanoid rig remain in use. The sleeve roots now extend 0.115 m under the jacket shell and widen across staged, bone-aligned rings. The cap is buried inside the torso, and shoulder weights blend from the clavicle into the upper arm before continuing across the elbow.
 
-Body trimming no longer keeps polygons by broad face-center boxes. It identifies head geometry from the source `Head` vertex group, rejects the separate 230-face flared neck component, and retains the larger connected head surfaces. A tapered neck loft bridges the head and shirt collar with `neck_01`, `Head`, and `spine_03` weights. Its final height is scaled to 92% around its midpoint, shortening it by about 9 mm while preserving overlap at the head and collar. A shaped, skinned rear jacket yoke meets the collar and closes the open neckline edge.
+Body trimming no longer keeps polygons by broad face-center boxes. It identifies head geometry from the source `Head` vertex group, rejects the separate 230-face flared neck component, and retains the larger connected head surfaces. A tapered neck loft bridges the head and shirt collar with `neck_01`, `Head`, and `spine_03` weights. The head-weighted skin and face details are lowered 25 mm together to reduce the exposed neck while preserving jaw contact and rigging; the loft remains scaled to 92% around its midpoint and overlaps the head and collar. A shaped, skinned rear jacket yoke meets the collar and closes the open neckline edge.
 
 Hand extraction now uses a plane derived from each lower-arm rest-pose bone, retaining the hand plus a short wrist overlap inside the cuff. Connected components under 50 faces are discarded to remove detached wrist fragments. Original hand vertex groups and skinning remain intact.
 
@@ -31,11 +31,11 @@ Blender regenerated front, three-quarter, and side idle views; front and three-q
 
 The committed representative previews include the current contact sheet, front idle/talking views, both sleeve details, frames 22 and 30, and the before/after comparison. Run the generator or full build to refresh the other views. The Godot capture confirms the model renders in the target engine:
 
-![Godot Compatibility-renderer capture](../art_source/output/v2/godot_engine_capture00000000.png)
+![Current Godot room preview](../assets/versailles/review/previews/versailles_room_participant_preview.png)
 
 ## Remaining limitations
 
-The sleeves now meet the jacket through the inspected idle and talking poses, though the low-poly shoulder silhouette is still somewhat rounded. The large source neck flaps and isolated pointed wrist pieces are absent in the reviewed frames. The neck loft now bends forward under the jaw to close the head-to-neck gap; its overlap was reviewed in Blender's idle and talking close-ups and the rebuilt model was imported into the Godot room preview. A narrow dark inner-collar seam remains at the shirt, and the three-piece suit and face are still stylized. The Godot frame shows the full chair and character at the existing demo camera distance, so Blender close-ups remain the more useful view for garment detail. These results cover the saved animation samples, not every interpolated frame.
+The sleeves now meet the jacket through the inspected idle and talking poses, though the low-poly shoulder silhouette is still somewhat rounded. The large source neck flaps and isolated pointed wrist pieces are absent in the reviewed frames. Lowering the head-weighted skin and face details shortens the exposed neck while keeping the jaw connected to the neck loft; the side and three-quarter profiles were reviewed in Blender, and the rebuilt model was imported into the Godot room preview. A narrow dark inner-collar seam remains at the shirt, and the three-piece suit and face are still stylized. The Godot frame shows the full chair and character at the existing demo camera distance, so Blender close-ups remain the more useful view for garment detail. These results cover the saved animation samples, not every interpolated frame.
 
 ## V3 original delegate personas
 
@@ -66,3 +66,45 @@ From the repository root, run `.\build_variants.ps1` to rebuild only the three v
 ## V2 reproduction
 
 From the repository root, run `.\build_and_validate.ps1`. It locates Blender and Godot through command-line parameters, environment variables, `PATH`, or documented Windows defaults; regenerates the character; imports it into Godot; runs `godot/tests/validate_suit.gd`; starts the demo; and captures a Compatibility-renderer PNG.
+
+## V2.2 Quaternius source-neck repair
+
+Recorded 18 November 2026 on `codex/versailles-seated-character` (base commit `e8ba44f`; working tree remains intentionally dirty). This section supersedes the V2.1 neck-replacement notes above. The original user-dirty worktree files were backed up before rebuilding to `C:\Users\marcu\AppData\Local\Temp\cases-neck-repair-backup-20261118`; its manifest contains SHA-256 hashes for all 21 pre-existing modified files.
+
+### Implementation
+
+- The default negotiator now retains the complete Quaternius `SuperHero_Male` head and neck components selected from the original connected mesh by `Head` and `neck_01` weights. The full source neck component is 536 faces; it is no longer cut down to only the 230 faces that pass a head-weight threshold.
+- A single parameter, `DEFAULT_NECK_HEAD_DROP_M = 0.043`, lowers source head and neck components together by 43 mm in rest space. The same drop is applied to the original weighted eyes and brows and to generated head-attached details. `--neck-head-drop-m` accepts 0 to 60 mm for bounded review.
+- The custom `make_neck()` loft and its obsolete `neck_length_scale` preset field are removed. A small rise in the existing jacket neckline/yoke extends its coverage by 20 mm. No replacement neck geometry is generated.
+- Only the default character was rebuilt. The Quaternius source files and the three alternate character GLBs were not modified.
+- SHA-256: source base character `D6F3B64CAB629F6DDCA9BA063811AEFFD3663A8A4E49ADE47CD9505DC2BBD70F`; source animation library `4C748767741A3E495D89667B9A218B690BA9810B9517A12E960780E3CA72C4E9`; rebuilt default character `12FDDD092DEEA55FBD76838F74B7F773D182BE7BC652F10AEFB65EFEF404C23E`.
+
+### Build and checks
+
+Rebuild from the project root with:
+
+```powershell
+.\build_and_validate.ps1 -BlenderPath 'C:\Program Files\Blender Foundation\Blender 4.2\blender.exe' -GodotPath 'D:\tools\Godot-4.7.2\Godot_v4.7.2-stable_win64_console.exe'
+```
+
+The final production run passed with Blender 4.2.2 and Godot 4.7.2. Godot imported all four character assets; the default has 65 bones, 39/39 skinned/weighted surfaces, both seated clips, and no replacement neck loft. All 11 required animated bones changed in each clip across 15 evenly spaced samples, the actor root stayed fixed, and pelvis height remained 0.583530 m in both clips. The other three character variants also passed their existing checks. `python -m unittest art_source.tests.test_persona_presets -v` passed all 14 tests, and Blender's neck-repair artifact contract passed both checks on the final `.blend`.
+
+The 43 mm trial was first built under a temporary artifact root and imported into an isolated Godot project; the same four-asset validator passed before the production GLB was replaced. The final production GLB was captured in Godot's Compatibility renderer (OpenGL 3.3, NVIDIA RTX 3060): 15 samples each for `SeatedIdle` and `SeatedTalking`, in both the seated demo and Versailles room. The room capture uses its existing `SeatedDemoCameraReference` marker because the room scene has no active camera. The actor remains aligned to its chair and table through both clips. Blender and Godot comparisons and contact sheets are under `art_source/output/v2/neck_repair/`; the reproducible Blender comparison script is `art_source/scripts/render_neck_repair_views.py`. Re-capture either scene with `Godot --path godot --script res://tests/capture_seated_animation_frames.gd -- <scene-path> <absolute-output-dir>`.
+
+### Visual review and remaining limitation
+
+The follow-up requested a little more drop than the original 40 mm setting. A 43 mm pass lowers the original head and neck a further 3 mm while retaining acceptable head-to-shoulder proportions in the front, three-quarter, and side views. The 45 mm trial sat too low, so 43 mm is the selected compromise. The head remains attached and not obviously sunken in the sampled Godot scenes. A low-poly skin shelf is still visible in close Blender views around the collar/shoulder transition; it is reduced at game distance and does not form a gap or animate through the clothes in the sampled frames. Ready for CASES v1 with that close-up cosmetic limitation documented.
+
+![Blender comparison of the 40 mm and 43 mm settings: front, three-quarter, and side in idle and talking poses](../art_source/output/v2/neck_repair/blender_40_to_43mm_comparison.png)
+
+![Original versus final 43 mm Blender result: front, three-quarter, and side in idle and talking poses](../art_source/output/v2/neck_repair/blender_before_after_43mm.png)
+
+![Godot demo 40 mm versus 43 mm comparison](../art_source/output/v2/neck_repair/godot_demo_40_to_43mm.png)
+
+![Original versus final 43 mm Versailles room comparison in idle and talking](../art_source/output/v2/neck_repair/godot_room_before_after_43mm.png)
+
+![Godot demo animation sweep, 15 samples per clip](../art_source/output/v2/neck_repair/godot_demo_43mm_15_sample_contact_sheet.png)
+
+![Godot Versailles room animation sweep, 15 samples per clip](../art_source/output/v2/neck_repair/godot_room_43mm_15_sample_contact_sheet.png)
+
+![Blender neck/collar close-up before and after](../art_source/output/v2/neck_repair/blender_neck_closeup_43mm.png)

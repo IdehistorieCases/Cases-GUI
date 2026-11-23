@@ -189,7 +189,7 @@ class PersonaPresetTests(unittest.TestCase):
         resolve = self.require_api("resolve_persona")
         validate = self.require_api("validate_persona_parameters")
         base = {
-            "body": {"torso_width_reduction": 0.1, "shoulder_width_reduction": 0.1, "arm_width_reduction": 0.05, "neck_width_reduction": 0.1, "torso_depth_reduction": 0.08, "neck_depth_reduction": 0.06, "neck_length_scale": 0.92},
+            "body": {"torso_width_reduction": 0.1, "shoulder_width_reduction": 0.1, "arm_width_reduction": 0.05, "neck_width_reduction": 0.1, "torso_depth_reduction": 0.08, "neck_depth_reduction": 0.06},
             "face": {"head_width_scale": 1.0, "jaw_width_scale": 1.0, "cheek_fullness": 1.0, "face_height_scale": 1.0, "face_depth_scale": 1.0},
             "identity": {"hair_style": "close_crop", "facial_hair": "moustache"},
             "jacket": {"hip_half_width": .196, "waist_half_width": .174, "chest_half_width": .21, "shoulder_half_width": .18, "depth_scale": .92, "front_opening_angle": .42, "front_style": "single_breasted", "collar_half_width": .067, "collar_depth": .048, "sleeve_shoulder_radius": .045, "sleeve_elbow_radius": .036, "sleeve_forearm_radius": .032, "sleeve_wrist_radius": .024, "sleeve_root_inset": .115, "sleeve_root_ratio": .5, "sleeve_length": .92, "lapel_width_scale": .9},

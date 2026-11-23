@@ -17,9 +17,6 @@ from mathutils import Vector
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SOURCE = ROOT / "art_source" / "vendor" / "quaternius"
-OUTPUT = ROOT / "art_source" / "output"
-V2_OUTPUT = OUTPUT / "v2"
-GODOT = ROOT / "godot" / "assets" / "characters"
 sys.path.insert(0, str(ROOT))
 from art_source.scripts.persona_presets import (
     PERSONA_IDS, resolve_persona, transform_face_point, validate_persona_parameters, variant_output_paths,
@@ -35,7 +32,6 @@ PRESET = {
         "neck_width_reduction": 0.10,
         "torso_depth_reduction": 0.08,
         "neck_depth_reduction": 0.06,
-        "neck_length_scale": 0.92,
     },
     "identity": {"hair_style": "close_crop", "facial_hair": "moustache"},
     "face": {
@@ -102,16 +98,34 @@ PRESET = {
         "backdrop": (0.40, 0.41, 0.40),
     },
 }
+DEFAULT_NECK_HEAD_DROP_M = 0.043
 
 # Parse and validate the complete selected profile before creating directories,
 # deleting scene objects, or touching any generated file.
 parser = argparse.ArgumentParser(description="Build the CASES seated negotiator")
 parser.add_argument("--persona", choices=("default", *PERSONA_IDS), default="default")
+parser.add_argument(
+    "--neck-head-drop-m", type=float, default=DEFAULT_NECK_HEAD_DROP_M,
+    help="Downward rest-space offset for the original Quaternius head/neck components and attached face details, in meters",
+)
+parser.add_argument(
+    "--artifact-root", type=pathlib.Path,
+    help="Write generated assets under this root instead of the project (safe trial output)",
+)
 script_args = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 args = parser.parse_args(script_args)
 PERSONA_ID = args.persona
+NECK_HEAD_DROP_M = args.neck_head_drop_m
+if not 0.0 <= NECK_HEAD_DROP_M <= 0.060:
+    raise ValueError("--neck-head-drop-m must be between 0 and 0.060 meters")
+if args.artifact_root and PERSONA_ID != "default":
+    raise ValueError("--artifact-root is currently supported only for the default negotiator")
 PRESET = resolve_persona(PERSONA_ID, PRESET)
 validate_persona_parameters(PRESET)
+ARTIFACT_ROOT = args.artifact_root.expanduser().resolve() if args.artifact_root else ROOT
+OUTPUT = ARTIFACT_ROOT / "art_source" / "output"
+V2_OUTPUT = OUTPUT / "v2"
+GODOT = ARTIFACT_ROOT / "godot" / "assets" / "characters"
 VARIANT_PATHS = variant_output_paths(ROOT, PERSONA_ID) if PERSONA_ID != "default" else None
 if VARIANT_PATHS:
     GLB_PATH = VARIANT_PATHS["glb"]
@@ -125,7 +139,7 @@ else:
     V2_OUTPUT.mkdir(parents=True, exist_ok=True)
 GODOT.mkdir(parents=True, exist_ok=True)
 PREVIEW_OUTPUT.mkdir(parents=True, exist_ok=True)
-print("PERSONA:", PERSONA_ID)
+print("PERSONA:", PERSONA_ID, "NECK_HEAD_DROP_M:", NECK_HEAD_DROP_M, "ARTIFACT_ROOT:", ARTIFACT_ROOT)
 
 bpy.ops.object.select_all(action="SELECT")
 bpy.ops.object.delete(use_global=False)
@@ -192,12 +206,122 @@ def transform_attached_face_mesh(mesh_object, head_only=False):
         vertex.co = inverse @ Vector(mapped)
 
 
+def connected_face_components(mesh, candidates):
+    edge_faces = {}
+    for polygon in mesh.polygons:
+        vertices = polygon.vertices
+        for first, second in zip(vertices, vertices[1:] + vertices[:1]):
+            edge_faces.setdefault(tuple(sorted((first, second))), []).append(polygon.index)
+
+    adjacent = {index: set() for index in candidates}
+    for linked_faces in edge_faces.values():
+        selected = [index for index in linked_faces if index in candidates]
+        for index in selected:
+            adjacent[index].update(other for other in selected if other != index)
+
+    components = []
+    remaining = set(candidates)
+    while remaining:
+        stack = [remaining.pop()]
+        component = []
+        while stack:
+            current = stack.pop()
+            component.append(current)
+            neighbors = adjacent[current] & remaining
+            remaining.difference_update(neighbors)
+            stack.extend(neighbors)
+        components.append(component)
+    return components
+
+
+def source_head_neck_components(mesh_object):
+    """Keep complete connected source components weighted to Head or neck_01."""
+    group_ids = {group.name: group.index for group in mesh_object.vertex_groups}
+    head_group = group_ids.get("Head")
+    neck_group = group_ids.get("neck_01")
+    if head_group is None or neck_group is None:
+        raise ValueError("Quaternius source must include Head and neck_01 vertex groups")
+
+    vertex_weights = []
+    for vertex in mesh_object.data.vertices:
+        weights = {assignment.group: assignment.weight for assignment in vertex.groups}
+        vertex_weights.append((weights.get(head_group, 0.0), weights.get(neck_group, 0.0)))
+    components = connected_face_components(mesh_object.data, set(range(len(mesh_object.data.polygons))))
+    retained_faces = set()
+    retained_vertices = set()
+    retained_sizes = []
+    source_neck_sizes = []
+    for component in components:
+        vertex_indices = {
+            vertex_index
+            for face_index in component
+            for vertex_index in mesh_object.data.polygons[face_index].vertices
+        }
+        if not vertex_indices:
+            continue
+        head_mean = sum(vertex_weights[index][0] for index in vertex_indices) / len(vertex_indices)
+        neck_mean = sum(vertex_weights[index][1] for index in vertex_indices) / len(vertex_indices)
+        if len(component) >= 150 and head_mean >= 0.25 and neck_mean >= 0.20:
+            source_neck_sizes.append(len(component))
+        if head_mean >= 0.25 or neck_mean >= 0.20:
+            retained_faces.update(component)
+            retained_vertices.update(vertex_indices)
+            retained_sizes.append(len(component))
+
+    if not source_neck_sizes:
+        raise ValueError("Could not identify the separate Quaternius neck shell by skin weights")
+    if not retained_vertices:
+        raise ValueError("Could not identify the retained Quaternius head surface")
+    print(
+        "SOURCE HEAD/NECK COMPONENTS:", sorted(retained_sizes),
+        "retained source neck component(s):", sorted(source_neck_sizes),
+    )
+    return retained_faces, retained_vertices
+
+
+def lower_mesh_vertices(mesh_object, vertex_indices):
+    """Apply the same rest-space translation to every shape and selected vertex."""
+    if not vertex_indices:
+        return 0
+    if not NECK_HEAD_DROP_M:
+        return len(vertex_indices)
+    local_drop = mesh_object.matrix_world.inverted().to_3x3() @ Vector((0.0, 0.0, NECK_HEAD_DROP_M))
+    coordinate_sets = (
+        [block.data for block in mesh_object.data.shape_keys.key_blocks]
+        if mesh_object.data.shape_keys
+        else [mesh_object.data.vertices]
+    )
+    for coordinates in coordinate_sets:
+        for index in vertex_indices:
+            coordinates[index].co -= local_drop
+    mesh_object.data.update()
+    return len(vertex_indices)
+
+
+def head_weighted_vertex_indices(mesh_object):
+    head_group = next((group.index for group in mesh_object.vertex_groups if group.name == "Head"), None)
+    if head_group is None:
+        return set()
+    return {
+        vertex.index
+        for vertex in mesh_object.data.vertices
+        if sum(assignment.weight for assignment in vertex.groups if assignment.group == head_group) >= 0.20
+    }
+
+
 # Shape the source head and imported eyes/brows in the same coordinate space.
 # The extracted scalp and custom features below inherit this exact mapping.
+SOURCE_HEAD_FACES, SOURCE_HEAD_VERTICES = source_head_neck_components(body)
 transform_attached_face_mesh(body, head_only=True)
 for obj in bpy.data.objects:
     if obj.type == "MESH" and obj.name in ("Eyes", "Eyebrows"):
         transform_attached_face_mesh(obj)
+        moved = lower_mesh_vertices(obj, head_weighted_vertex_indices(obj))
+        if moved == 0:
+            raise ValueError(f"Source face feature mesh {obj.name!r} has no Head-weighted vertices")
+        print("LOWERED SOURCE FACE FEATURE:", obj.name, moved, "vertices")
+body_moved = lower_mesh_vertices(body, SOURCE_HEAD_VERTICES)
+print("LOWERED SOURCE HEAD SURFACE:", body_moved, "vertices by", NECK_HEAD_DROP_M, "m")
 
 
 def fit_base_proportions(mesh_object):
@@ -358,6 +482,8 @@ JACKET_PROFILE = [
     (1.475, JACKET["collar_half_width"] * 2.05, 0.088 * JACKET["depth_scale"], 0.035),
     (1.492, JACKET["collar_half_width"] * 1.48, 0.067 * JACKET["depth_scale"], 0.036),
     (1.505, JACKET["collar_half_width"], JACKET["collar_depth"], 0.036),
+    (1.515, JACKET["collar_half_width"] * 0.97, JACKET["collar_depth"] * 0.96, 0.036),
+    (1.525, JACKET["collar_half_width"] * 0.93, JACKET["collar_depth"] * 0.92, 0.036),
 ]
 JACKET_PROFILE = offset_profile(JACKET_PROFILE, PRESET["fit"]["body_clearance"])
 
@@ -427,7 +553,7 @@ coat = surface_mesh("03 · Tailored midnight jacket", JACKET_PROFILE, jacket_ang
 
 def make_jacket_neck_yoke():
     """Close the rear neckline between the jacket shell and shirt collar."""
-    sections = [(1.492, 0.064, 0.051), (1.505, 0.060, 0.048), (1.515, 0.056, 0.045)]
+    sections = [(1.492, 0.064, 0.051), (1.505, 0.060, 0.048), (1.515, 0.056, 0.045), (1.525, 0.053, 0.042)]
     angular_count = 24
     radial_steps = 4
     vertices = []
@@ -1024,21 +1150,22 @@ def face_size(scale, profile):
 
 def face_surface_point(x, z):
     mapped = transform_face_point((x, 0.0, z), PRESET["face"])
-    hit, location, _, _ = body.ray_cast(Vector((mapped[0], -0.30, mapped[2])), Vector((0.0, 1.0, 0.0)))
+    lowered_z = mapped[2] - NECK_HEAD_DROP_M
+    hit, location, _, _ = body.ray_cast(Vector((mapped[0], -0.30, lowered_z)), Vector((0.0, 1.0, 0.0)))
     y = location.y - 0.002 if hit else -0.104
-    return (mapped[0], y, mapped[2])
+    return (mapped[0], y, lowered_z)
 
 
 def make_hair_and_face():
     hair_style = PRESET["identity"]["hair_style"]
     if hair_style == "close_crop":
-        hairline = lambda center: 1.724 - 0.006 * math.exp(-((center.x + 0.035) / 0.026) ** 2)
+        hairline = lambda center: 1.724 - NECK_HEAD_DROP_M - 0.006 * math.exp(-((center.x + 0.035) / 0.026) ** 2)
     elif hair_style == "receding_silver":
-        hairline = lambda center: 1.734 - 0.003 * math.exp(-((center.x + 0.035) / 0.026) ** 2)
+        hairline = lambda center: 1.734 - NECK_HEAD_DROP_M - 0.003 * math.exp(-((center.x + 0.035) / 0.026) ** 2)
     elif hair_style == "side_part":
-        hairline = lambda center: 1.718 + 0.0035 * smoothstep((center.x + 0.12) / 0.24)
+        hairline = lambda center: 1.718 - NECK_HEAD_DROP_M + 0.0035 * smoothstep((center.x + 0.12) / 0.24)
     else:  # short_wavy
-        hairline = lambda center: 1.716 + 0.0012 * math.sin(center.x * 58.0)
+        hairline = lambda center: 1.716 - NECK_HEAD_DROP_M + 0.0012 * math.sin(center.x * 58.0)
     cut_from_body(
         "Hair cap · " + hair_style,
         lambda center: center.z > hairline(center) and abs(center.x) < 0.15,
@@ -1047,8 +1174,10 @@ def make_hair_and_face():
     )
     for side in (-1.0, 1.0):
         eye_center = transform_face_point((side * 0.024, -0.084, 1.699), PRESET["face"])
+        eye_center = (eye_center[0], eye_center[1], eye_center[2] - NECK_HEAD_DROP_M)
         iris_scale = face_size((0.0075, 0.0032, 0.008), PRESET["face"])
         pupil_center = transform_face_point((side * 0.024, -0.087, 1.699), PRESET["face"])
+        pupil_center = (pupil_center[0], pupil_center[1], pupil_center[2] - NECK_HEAD_DROP_M)
         pupil_scale = face_size((0.0035, 0.0018, 0.0045), PRESET["face"])
         uvball("Brown iris " + str(int(side)), eye_center, iris_scale, iris_material, {"Head": 1.0})
         uvball("Pupil " + str(int(side)), pupil_center, pupil_scale, pupil_material, {"Head": 1.0})
@@ -1067,8 +1196,8 @@ def make_hair_and_face():
         # Extract the beard from the actual head surface so it follows the
         # sculpt and Head weights instead of spanning it as a floating polygon.
         def beard_region(center):
-            upper_edge = 1.635 - 0.12 * abs(center.x)
-            return center.y < -0.055 and 1.590 < center.z < upper_edge and abs(center.x) < 0.050
+            upper_edge = 1.635 - NECK_HEAD_DROP_M - 0.12 * abs(center.x)
+            return center.y < -0.055 and 1.590 - NECK_HEAD_DROP_M < center.z < upper_edge and abs(center.x) < 0.050
         cut_from_body("Close-set scholarly beard", beard_region, 0.0025, hair_material, thickness=0.001)
 
 
@@ -1094,55 +1223,14 @@ for vertex in body_mesh.vertices:
                 weights[name] = assignment.weight
     vertex_weights.append(weights)
 
-def connected_face_components(mesh, candidates):
-    edge_faces = {}
-    for polygon in mesh.polygons:
-        vertices = polygon.vertices
-        for first, second in zip(vertices, vertices[1:] + vertices[:1]):
-            edge_faces.setdefault(tuple(sorted((first, second))), []).append(polygon.index)
-
-    adjacent = {index: set() for index in candidates}
-    for linked_faces in edge_faces.values():
-        selected = [index for index in linked_faces if index in candidates]
-        for index in selected:
-            adjacent[index].update(other for other in selected if other != index)
-
-    components = []
-    remaining = set(candidates)
-    while remaining:
-        stack = [remaining.pop()]
-        component = []
-        while stack:
-            current = stack.pop()
-            component.append(current)
-            neighbors = adjacent[current] & remaining
-            remaining.difference_update(neighbors)
-            stack.extend(neighbors)
-        components.append(component)
-    return components
-
 def selected_components(candidates, label, minimum_faces=12):
     components = connected_face_components(body_mesh, candidates)
     retained = [component for component in components if len(component) >= minimum_faces]
-    if label == "head":
-        # The source assigns Head influence to a small flared neck shell too.
-        # Keep the facial/head components but replace that jagged shell with a
-        # clean neck loft below.
-        clean_head = []
-        for component in retained:
-            z_values = [body_mesh.vertices[vertex].co.z
-                        for face_index in component
-                        for vertex in body_mesh.polygons[face_index].vertices]
-            if min(z_values) < 1.58 and max(z_values) < 1.64:
-                print("BODY REGION head: replacing flared source neck component", len(component))
-                continue
-            clean_head.append(component)
-        retained = clean_head
     print("BODY REGION", label, "components", sorted((len(component) for component in components), reverse=True),
           "retained", sum(map(len, retained)))
     return {index for component in retained for index in component}
 
-head_candidates = set()
+
 hand_candidates = {"hand_l": set(), "hand_r": set()}
 hand_planes = {}
 for name in hand_candidates:
@@ -1151,9 +1239,6 @@ for name in hand_candidates:
     hand_planes[name] = (lower_bone.tail_local.copy(), forearm_axis)
 for polygon in body_mesh.polygons:
     weights = [vertex_weights[index] for index in polygon.vertices]
-    head_weight = sum(row["Head"] for row in weights) / len(weights)
-    if head_weight >= 0.25:
-        head_candidates.add(polygon.index)
     center = polygon.center
     for name in hand_candidates:
         wrist, forearm_axis = hand_planes[name]
@@ -1165,9 +1250,11 @@ for polygon in body_mesh.polygons:
         if wrist_plane_distance >= -0.026 and source_hand_influence > 0.001:
             hand_candidates[name].add(polygon.index)
 
-keep_faces = selected_components(head_candidates, "head")
+head_keep_faces = SOURCE_HEAD_FACES
+hand_keep_faces = set()
 for name, candidates in hand_candidates.items():
-    keep_faces |= selected_components(candidates, name, minimum_faces=50)
+    hand_keep_faces |= selected_components(candidates, name, minimum_faces=50)
+keep_faces = head_keep_faces | hand_keep_faces
 
 bm = bmesh.new()
 bm.from_mesh(body_mesh)
@@ -1187,51 +1274,6 @@ if not body.data.polygons:
     raise ValueError("Anatomical skin extraction removed all visible body faces")
 body.data.materials.clear()
 body.data.materials.append(skin_material)
-
-
-def make_neck():
-    """Bridge the source head to the shirt collar with a clean skinned neck."""
-    sections = [
-        (1.485, 0.042, 0.038, {"spine_03": 0.35, "neck_01": 0.65}),
-        (1.505, 0.043, 0.039, {"spine_03": 0.20, "neck_01": 0.80}),
-        (1.525, 0.044, 0.040, {"neck_01": 1.0}),
-        (1.545, 0.044, 0.039, {"neck_01": 0.85, "Head": 0.15}),
-        (1.565, 0.040, 0.037, {"neck_01": 0.55, "Head": 0.45}),
-        (1.585, 0.034, 0.033, {"neck_01": 0.20, "Head": 0.80}),
-        (1.600, 0.028, 0.027, {"Head": 1.0}),
-    ]
-    radial_count = 24
-    vertices = []
-    weights = []
-    faces = []
-    neck_midpoint = (sections[0][0] + sections[-1][0]) * 0.5
-    neck_length_scale = PRESET["body"]["neck_length_scale"]
-    if not 0.90 <= neck_length_scale <= 1.0:
-        raise ValueError("body.neck_length_scale must stay between 90% and 100%")
-    for z, radius_x, radius_y, bone_weights in sections:
-        for column in range(radial_count):
-            angle = 2.0 * math.pi * column / radial_count
-            adjusted_z = neck_midpoint + (z - neck_midpoint) * neck_length_scale
-            # The source head and jaw lean forward relative to the neck bone.
-            # Bend the upper loft toward the face so its capped end nests inside
-            # the underside of the jaw instead of stopping behind it.
-            headward = smoothstep((z - 1.49) / (1.60 - 1.49))
-            center_y = 0.038 - 0.050 * headward
-            vertices.append((radius_x * math.sin(angle), center_y - radius_y * math.cos(angle), adjusted_z))
-            weights.append(bone_weights)
-    for row in range(len(sections) - 1):
-        for column in range(radial_count):
-            next_column = (column + 1) % radial_count
-            a = row * radial_count + column
-            b = (row + 1) * radial_count + column
-            faces.append((a, row * radial_count + next_column, (row + 1) * radial_count + next_column, b))
-    faces.append(tuple(reversed(range(radial_count))))
-    top = (len(sections) - 1) * radial_count
-    faces.append(tuple(top + column for column in range(radial_count)))
-    skinned("Anatomical neck transition", vertices, faces, weights, skin_material, 0.001)
-
-
-make_neck()
 
 
 def cube(name, location, size, material, bevel=0.012):
@@ -1282,6 +1324,7 @@ for action in list(bpy.data.actions):
     if action not in clips.values():
         bpy.data.actions.remove(action)
 print("NLA", [(track.name, [strip.action.name for strip in track.strips]) for track in rig.animation_data.nla_tracks])
+
 
 for track in rig.animation_data.nla_tracks:
     track.mute = False
@@ -1362,6 +1405,7 @@ if PERSONA_ID == "default":
     render_view("seated_idle_side.png", idle, 15, side_camera, torso_target)
     render_view("seated_talking_front.png", talking, 22, front, torso_target)
     render_view("seated_talking_three_quarter.png", talking, 22, three_quarter, torso_target)
+    render_view("seated_talking_side.png", talking, 22, side_camera, torso_target)
     render_view("left_sleeve_detail.png", talking, 30, (0.62, -1.55, 1.12), (0.36, 0.12, 1.05), 56)
     render_view("right_sleeve_detail.png", talking, 22, (-0.62, -1.55, 1.13), (-0.36, 0.12, 1.05), 56)
     render_view("jacket_detail.png", idle, 15, (0.0, -2.16, 1.65), (0.0, 0.19, 1.36), 60)
@@ -1376,6 +1420,8 @@ else:
     render_view("seated_idle_three_quarter.png", idle, 15, three_quarter, torso_target)
     render_view("seated_idle_side.png", idle, 15, side_camera, torso_target)
     render_view("seated_talking_front.png", talking, 22, front, torso_target)
+    render_view("seated_talking_three_quarter.png", talking, 22, three_quarter, torso_target)
+    render_view("seated_talking_side.png", talking, 22, side_camera, torso_target)
     render_view("talking_frame_22.png", talking, 22, front, torso_target)
     render_view("talking_frame_30.png", talking, 30, front, torso_target)
     render_view("left_sleeve_detail.png", talking, 30, (0.62, -1.55, 1.12), (0.36, 0.12, 1.05), 56)

@@ -35,6 +35,7 @@ $requiredPreviews = @(
     "seated_idle_side.png",
     "seated_talking_front.png",
     "seated_talking_three_quarter.png",
+    "seated_talking_side.png",
     "left_sleeve_detail.png",
     "right_sleeve_detail.png",
     "jacket_detail.png"
