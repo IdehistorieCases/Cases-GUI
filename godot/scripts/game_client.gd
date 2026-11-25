@@ -131,6 +131,7 @@ func _build_interface() -> void:
 	screen.add_child(margins)
 
 	var page := VBoxContainer.new()
+	page.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	page.add_theme_constant_override("separation", 12)
 	margins.add_child(page)
 
