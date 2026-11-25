@@ -161,6 +161,8 @@ func _build_header() -> PanelContainer:
 	margin.add_child(row)
 
 	var brand := VBoxContainer.new()
+	brand.custom_minimum_size = Vector2(158, 0)
+	brand.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	brand.add_theme_constant_override("separation", 0)
 	brand.add_child(_make_label("CASES", 20, COLOR_GOLD, true))
 	brand.add_child(_make_label("PARIS · 1919", 11, COLOR_MUTED, true))
@@ -171,6 +173,8 @@ func _build_header() -> PanelContainer:
 	row.add_child(spacer)
 
 	_header_status = _make_label("Forbinder …", 13, COLOR_AMBER, true)
+	_header_status.custom_minimum_size = Vector2(230, 0)
+	_header_status.size_flags_horizontal = Control.SIZE_SHRINK_END
 	_header_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	row.add_child(_header_status)
 
@@ -296,6 +300,8 @@ func _build_conversation() -> PanelContainer:
 	top.add_theme_constant_override("separation", 10)
 	column.add_child(top)
 	var title_block := VBoxContainer.new()
+	title_block.custom_minimum_size = Vector2(380, 0)
+	title_block.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	title_block.add_theme_constant_override("separation", 1)
 	title_block.add_child(_make_label("FORHANDLING", 14, COLOR_GOLD, true))
 	title_block.add_child(_make_label("Dine indlæg og CASES-simuleringens svar", 12, COLOR_MUTED))
@@ -304,6 +310,8 @@ func _build_conversation() -> PanelContainer:
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(spacer)
 	_simulation_badge = _make_label("SIMULATION", 11, COLOR_AMBER, true)
+	_simulation_badge.custom_minimum_size = Vector2(190, 0)
+	_simulation_badge.size_flags_horizontal = Control.SIZE_SHRINK_END
 	_simulation_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	top.add_child(_simulation_badge)
 
