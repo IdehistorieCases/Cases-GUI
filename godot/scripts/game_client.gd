@@ -7,7 +7,7 @@ const BACKEND_API_SCRIPT = preload("res://scripts/cases_backend_api.gd")
 const SEATED_DEMO_SCENE: PackedScene = preload("res://scenes/seated_suit_demo.tscn")
 const SCENARIO_SLUG := "versailles-1919"
 const PLAYER_ROLE_ID := "british_adviser"
-const NARRATOR_ID := "local_qwen"
+const NARRATOR_ID := "gpt6_luna_high"
 const SESSION_STORE_PATH := "user://cases_sessions.json"
 const DEFAULT_BACKEND_URL := "http://127.0.0.1:18081"
 const INITIALIZATION_POLL_LIMIT := 180
@@ -223,7 +223,7 @@ func _build_sidebar() -> PanelContainer:
 	column.add_child(_endpoint_input)
 	_sidebar_status = _make_label("Backend kontrolleres …", 12, COLOR_AMBER)
 	column.add_child(_sidebar_status)
-	_narrator_status_label = _make_label("Lokal AI: kontrolleres …", 12, COLOR_MUTED)
+	_narrator_status_label = _make_label("ChatGPT 6 Luna: kontrolleres …", 12, COLOR_MUTED)
 	column.add_child(_narrator_status_label)
 
 	column.add_child(_make_separator())
@@ -493,14 +493,14 @@ func _connect_backend() -> void:
 				_narrator_ready = bool(narrator.get("ready", false))
 				break
 	if _narrator_ready:
-		_narrator_status_label.text = "Lokal AI: klar"
+		_narrator_status_label.text = "ChatGPT 6 Luna: klar"
 		_narrator_status_label.add_theme_color_override("font_color", COLOR_GREEN)
 	else:
-		_narrator_status_label.text = "Lokal AI: ikke klar endnu — åbningen kan fejle"
+		_narrator_status_label.text = "ChatGPT 6 Luna: ikke klar endnu — åbningen kan fejle"
 		_narrator_status_label.add_theme_color_override("font_color", COLOR_AMBER)
 
 	print(
-		"CASES backend ready: %s/%s; local_qwen_ready=%s"
+		"CASES backend ready: %s/%s; gpt6_luna_high_ready=%s"
 		% [str(_scenario.get("slug", "")), str(_scenario.get("version", "")), str(_narrator_ready)]
 	)
 	_set_status("Backend og database er klar.", "ok")
