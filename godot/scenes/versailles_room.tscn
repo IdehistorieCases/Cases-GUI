@@ -651,7 +651,7 @@ mesh = SubResource("BoxMesh_asl8a")
 
 [node name="NegotiationSeating" type="Node3D" parent="Furniture" unique_id=141873277]
 script = ExtResource("10_seating")
-participant_countries = PackedStringArray("France", "United Kingdom", "United States", "Italy", "Japan", "Belgium")
+participant_countries = PackedStringArray("United States", "France", "Italy", "China", "Japan", "United Kingdom")
 
 [node name="Lighting" type="Node3D" parent="." unique_id=175320237]
 

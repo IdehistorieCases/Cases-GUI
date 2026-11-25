@@ -5,6 +5,8 @@ extends Node
 
 var base_url: String = "http://127.0.0.1:18082"
 
+const DEFAULT_REQUEST_TIMEOUT_SECONDS := 20.0
+
 var _http: HTTPRequest
 var _in_flight := false
 
@@ -12,7 +14,7 @@ var _in_flight := false
 func _ready() -> void:
 	_http = HTTPRequest.new()
 	_http.name = "HTTPRequest"
-	_http.timeout = 20.0
+	_http.timeout = DEFAULT_REQUEST_TIMEOUT_SECONDS
 	_http.max_redirects = 0
 	add_child(_http)
 
@@ -21,22 +23,28 @@ func set_base_url(value: String) -> void:
 	base_url = value.strip_edges().trim_suffix("/")
 
 
-func get_json(path: String, bearer_token: String = "") -> Dictionary:
-	return await request_json(HTTPClient.METHOD_GET, path, null, bearer_token)
+func get_json(
+	path: String,
+	bearer_token: String = "",
+	timeout_seconds: float = DEFAULT_REQUEST_TIMEOUT_SECONDS
+) -> Dictionary:
+	return await request_json(HTTPClient.METHOD_GET, path, null, bearer_token, {}, timeout_seconds)
 
 
 func post_json(
 	path: String,
 	payload: Variant = null,
 	bearer_token: String = "",
-	extra_headers: Dictionary = {}
+	extra_headers: Dictionary = {},
+	timeout_seconds: float = DEFAULT_REQUEST_TIMEOUT_SECONDS
 ) -> Dictionary:
 	return await request_json(
 		HTTPClient.METHOD_POST,
 		path,
 		payload,
 		bearer_token,
-		extra_headers
+		extra_headers,
+		timeout_seconds
 	)
 
 
@@ -45,7 +53,8 @@ func request_json(
 	path: String,
 	payload: Variant = null,
 	bearer_token: String = "",
-	extra_headers: Dictionary = {}
+	extra_headers: Dictionary = {},
+	timeout_seconds: float = DEFAULT_REQUEST_TIMEOUT_SECONDS
 ) -> Dictionary:
 	if _http == null:
 		return _failure(0, "Netværksklienten er ikke startet.")
@@ -64,8 +73,11 @@ func request_json(
 		headers.append("%s: %s" % [str(header_name), str(extra_headers[header_name])])
 
 	_in_flight = true
+	var previous_timeout := _http.timeout
+	_http.timeout = maxf(timeout_seconds, 0.1)
 	var request_error := _http.request(url, headers, method, request_body)
 	if request_error != OK:
+		_http.timeout = previous_timeout
 		_in_flight = false
 		return _failure(
 			0,
@@ -73,6 +85,7 @@ func request_json(
 		)
 
 	var response: Array = await _http.request_completed
+	_http.timeout = previous_timeout
 	_in_flight = false
 	if response.size() < 4:
 		return _failure(0, "Backend returnerede et ufuldstændigt HTTP-svar.")

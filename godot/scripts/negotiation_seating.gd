@@ -34,7 +34,7 @@ var _material_cache: Dictionary = {}
 		chair_count = participant_count
 		_rebuild_if_ready()
 
-## Countries in seat order, starting north and moving clockwise. Supported names include France, United Kingdom/UK, United States/USA, Italy, Japan, Belgium, Poland, Romania, China (1912-1928), Portugal (1911), Germany/German Empire (June 1919), and Greece. Unknown names use France.
+## Countries in seat order, starting north and moving clockwise. Supported names include France, United Kingdom/UK, United States/USA, Italy, Japan, Belgium, Poland, Romania, China/China (1912-1928), Portugal (1911), Germany/German Empire (June 1919), and Greece. Unknown names use France.
 @export var participant_countries: PackedStringArray = PackedStringArray([
 	"France", "United Kingdom", "United States", "Italy", "Japan", "Belgium"
 ]):
@@ -212,7 +212,7 @@ func _flag_style(country: String) -> Dictionary:
 			return {"kind": "stripes", "layout": "horizontal", "colors": [Color8(255, 255, 255), Color8(220, 20, 60)]}
 		"Romania":
 			return {"kind": "stripes", "layout": "vertical", "colors": [Color8(0, 43, 127), Color8(252, 209, 22), Color8(206, 17, 38)]}
-		"China (1912-1928)":
+		"China", "China (1912-1928)", "Republic of China":
 			return {"kind": "stripes", "layout": "horizontal", "colors": [Color8(222, 41, 16), Color8(255, 222, 0), Color8(0, 62, 126), Color8(255, 255, 255), Color8(0, 0, 0)]}
 		"Portugal (1911)":
 			return {"kind": "stripes", "layout": "vertical", "colors": [Color8(0, 102, 0), Color8(255, 0, 0)]}

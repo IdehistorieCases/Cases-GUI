@@ -1,3 +1,34 @@
+# CASES connected-gameplay verification — 25 November 2026
+
+## Scope and source
+
+The visible GUI pass used Godot 4.7.2, the `Cases-GUI` working tree at base commit `9d78c32` (matching `origin/main`), and the local `Cases-Backend` development stack with the outcome-summary fix built into its API and turn-worker containers. The stack's PostgreSQL volume was preserved. The live Versailles release was schema v2, version `3.1-ai`.
+
+The run created one new local test session and left it completed in the development database and Godot's per-user session store. Other saved sessions were not changed.
+
+## Live playthrough
+
+- Started a new negotiation and confirmed the backend-generated opening and player prompt appeared.
+- Resumed the saved session in the running GUI, then submitted two Danish proposals about security guarantees, reconstruction, and affected delegations' representation.
+- The backend committed both proposal turns with three delegate dialogue actors per turn: Britain, France, and China. The GUI showed simulated delegate responses, narrator text, outcome summaries, and updated prompts.
+- Used the explicit **Afslut forløb** action. The backend recorded `player_end`; the proposal composer disappeared and the completed view showed the reason for ending, final response, and outcome.
+- The structured reflection loaded successfully and was cached. It reported the lack of approved historical passages, gave qualitative objective feedback and uncertainty notes, and made no scoring or mastery claim.
+- Closed and relaunched the app, then resumed the completed session. Its transcript, completion state, and cached reflection returned.
+- Replaced the configured endpoint with the unused local port `9`; the GUI reported a network failure. Restoring `http://127.0.0.1:18082` restored the connected state without losing the session or result.
+
+## Regression and backend checks
+
+- `res://tests/validate_game_reflection.gd` — passed. It checks the end-state panel, null-prompt fallback, reflection endpoint and 300-second timeout, preserved long transcript text, completion retry after a simulated HTTP 503 using the same idempotency key, and reflection retry after a simulated HTTP 503.
+- `res://tests/validate_game_hud.gd` — passed.
+- `res://tests/validate_room_integration.gd` — passed.
+- Godot 4.7.2 editor import/parser startup — passed.
+- `uv run --locked --project backend pytest backend/tests -q` — **310 passed, 108 skipped**.
+- `uv run --locked --project backend ruff check backend/app/runtime/proposals.py backend/tests/test_turn_proposals.py` — passed.
+
+The 503 reflection retry was tested with the GUI regression harness; the live provider returned a successful reflection during the GUI pass. The separate connection failure/recovery check was exercised in the visible GUI.
+
+---
+
 # Suited Negotiator V2.1 geometry repair
 
 Recorded 18 November 2026 on Windows with Blender 4.2.2 and Godot 4.7.2 stable. Run from the repository root with `.\build_and_validate.ps1`.

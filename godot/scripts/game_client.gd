@@ -4,7 +4,10 @@ extends Node
 ## The backend remains authoritative for scenario state and generated dialogue.
 
 const BACKEND_API_SCRIPT = preload("res://scripts/cases_backend_api.gd")
-const SEATED_DEMO_SCENE: PackedScene = preload("res://scenes/seated_suit_demo.tscn")
+const ROOM_SCENE: PackedScene = preload("res://scenes/versailles_room_preview.tscn")
+const BRITISH_DELEGATE: PackedScene = preload("res://assets/characters/cases_suited_negotiator.glb")
+const FRENCH_DELEGATE: PackedScene = preload("res://assets/characters/cases_suited_negotiator_senior_mediator.glb")
+const CHINESE_DELEGATE: PackedScene = preload("res://assets/characters/cases_suited_negotiator_scholarly_delegate.glb")
 const SCENARIO_SLUG := "versailles-1919"
 const PLAYER_ROLE_ID := "british_adviser"
 const NARRATOR_ID := "gpt6_luna_high"
@@ -12,6 +15,7 @@ const SESSION_STORE_PATH := "user://cases_sessions.json"
 const DEFAULT_BACKEND_URL := "http://127.0.0.1:18082"
 const INITIALIZATION_POLL_LIMIT := 180
 const TURN_POLL_LIMIT := 360
+const REFLECTION_REQUEST_TIMEOUT_SECONDS := 300.0
 
 const COLOR_GOLD := Color(0.79, 0.64, 0.39, 1.0)
 const COLOR_TEXT := Color(0.91, 0.89, 0.83, 1.0)
@@ -22,6 +26,7 @@ const COLOR_AMBER := Color(0.91, 0.72, 0.39, 1.0)
 
 var _api: Node
 var _store: Dictionary = {"sessions": [], "current_session_local_id": "", "base_url": ""}
+var _session_store_path := SESSION_STORE_PATH
 var _api_base_url := DEFAULT_BACKEND_URL
 var _scenario: Dictionary = {}
 var _player_role: Dictionary = {}
@@ -54,15 +59,33 @@ var _new_session_button: Button
 var _resume_button: Button
 var _retry_opening_button: Button
 var _retry_turn_button: Button
+var _complete_button: Button
+var _retry_reflection_button: Button
 var _send_button: Button
+var _composer_row: HBoxContainer
+var _results_panel: PanelContainer
+var _results_status_label: Label
+var _results_scroll: ScrollContainer
+var _results_content: VBoxContainer
 var _simulation_badge: Label
+var _turn_status_label: Label
+var _connection_details: VBoxContainer
+var _connection_toggle_button: Button
 var _latest_turn_request_id := ""
+var _reflection_retry_pending := false
+var _reflection_failed_permanently := false
+var _reflection_loading := false
+var _reflection_error := ""
+var _reflection_result: Dictionary = {}
+var _delegate_players: Dictionary = {}
+var _active_delegate_id := "france"
 
 
 func _ready() -> void:
-	var seated_demo: Node = SEATED_DEMO_SCENE.instantiate()
-	seated_demo.name = "SeatedNegotiatorPreview"
-	add_child(seated_demo)
+	var room: Node3D = ROOM_SCENE.instantiate() as Node3D
+	room.name = "VersaillesNegotiationRoom"
+	add_child(room)
+	_populate_delegates(room)
 
 	_api = BACKEND_API_SCRIPT.new()
 	_api.name = "CasesBackendApi"
@@ -74,9 +97,61 @@ func _ready() -> void:
 	_connect_backend()
 
 
+func _populate_delegates(room: Node3D) -> void:
+	var seating := room.get_node_or_null("VersaillesRoom/Furniture/NegotiationSeating")
+	if seating == null:
+		push_warning("CASES: room seating was not found; delegates will not be shown.")
+		return
+
+	# The active Versailles scenario has three delegations: Britain, France and China.
+	var roster := [
+		{"id": "britain", "label": "Storbritannien", "scene": BRITISH_DELEGATE, "seat": 5},
+		{"id": "france", "label": "Frankrig", "scene": FRENCH_DELEGATE, "seat": 1},
+		{"id": "china", "label": "Kina", "scene": CHINESE_DELEGATE, "seat": 3},
+	]
+	for member in roster:
+		var seat_name := "Participant_%02d" % (int(member["seat"]) + 1)
+		var seat: Node3D = seating.get_node_or_null(seat_name) as Node3D
+		if seat == null:
+			continue
+		var chair := seat.get_node_or_null("Chair")
+		if chair != null:
+			chair.visible = false # Each seated negotiator asset includes its own chair.
+		var actor: Node3D = member["scene"].instantiate() as Node3D
+		if actor == null:
+			continue
+		actor.name = "Delegate_" + str(member["id"])
+		actor.position = Vector3.ZERO
+		seat.add_child(actor)
+		var animation_player := _find_animation_player(actor)
+		if animation_player != null and animation_player.has_animation("SeatedIdle"):
+			animation_player.play("SeatedIdle")
+			_delegate_players[str(member["id"])] = animation_player
+		var nameplate := Label3D.new()
+		nameplate.name = "DelegateNameplate"
+		nameplate.text = str(member["label"])
+		nameplate.position = Vector3(0.0, 2.05, 0.0)
+		nameplate.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		nameplate.font_size = 24
+		nameplate.pixel_size = 0.006
+		nameplate.outline_size = 4
+		nameplate.modulate = Color(0.96, 0.88, 0.67, 1.0)
+		seat.add_child(nameplate)
+
+
+func _find_animation_player(node: Node) -> AnimationPlayer:
+	if node is AnimationPlayer:
+		return node as AnimationPlayer
+	for child in node.get_children():
+		var result := _find_animation_player(child)
+		if result != null:
+			return result
+	return null
+
+
 func _load_store() -> void:
-	if FileAccess.file_exists(SESSION_STORE_PATH):
-		var file := FileAccess.open(SESSION_STORE_PATH, FileAccess.READ)
+	if FileAccess.file_exists(_session_store_path):
+		var file := FileAccess.open(_session_store_path, FileAccess.READ)
 		if file != null:
 			var parsed: Variant = JSON.parse_string(file.get_as_text())
 			if parsed is Dictionary:
@@ -96,7 +171,7 @@ func _load_store() -> void:
 
 func _save_store() -> void:
 	_store["base_url"] = _api_base_url
-	var file := FileAccess.open(SESSION_STORE_PATH, FileAccess.WRITE)
+	var file := FileAccess.open(_session_store_path, FileAccess.WRITE)
 	if file == null:
 		_set_status(
 			"Kunne ikke gemme den lokale session (%d)." % FileAccess.get_open_error(),
@@ -113,16 +188,19 @@ func _build_interface() -> void:
 	add_child(canvas)
 
 	var screen := Control.new()
+	screen.name = "HudRoot"
+	screen.mouse_filter = Control.MOUSE_FILTER_PASS
 	screen.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	canvas.add_child(screen)
 
 	var scrim := ColorRect.new()
-	scrim.color = Color(0.025, 0.035, 0.043, 0.42)
+	scrim.color = Color(0.025, 0.035, 0.043, 0.18)
 	scrim.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	scrim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	screen.add_child(scrim)
 
 	var margins := MarginContainer.new()
+	margins.name = "HudSafeArea"
 	margins.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	margins.add_theme_constant_override("margin_left", 22)
 	margins.add_theme_constant_override("margin_top", 18)
@@ -131,24 +209,28 @@ func _build_interface() -> void:
 	screen.add_child(margins)
 
 	var page := VBoxContainer.new()
+	page.name = "HudLayout"
 	page.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	page.add_theme_constant_override("separation", 12)
 	margins.add_child(page)
 
 	page.add_child(_build_header())
 	var content := HBoxContainer.new()
+	content.name = "HudContent"
 	content.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	content.add_theme_constant_override("separation", 12)
 	page.add_child(content)
 	content.add_child(_build_sidebar())
 	content.add_child(_build_conversation())
 
+	_update_session_label()
 	_update_controls()
 
 
 func _build_header() -> PanelContainer:
 	var panel := _make_panel(Color(0.075, 0.09, 0.10, 0.96), COLOR_GOLD)
-	panel.custom_minimum_size = Vector2(0, 66)
+	panel.name = "TopBar"
+	panel.custom_minimum_size = Vector2(0, 62)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 14)
 	row.add_theme_constant_override("margin_left", 16)
@@ -173,13 +255,13 @@ func _build_header() -> PanelContainer:
 	row.add_child(spacer)
 
 	_header_status = _make_label("Forbinder …", 13, COLOR_AMBER, true)
-	_header_status.custom_minimum_size = Vector2(230, 0)
+	_header_status.custom_minimum_size = Vector2(168, 0)
 	_header_status.size_flags_horizontal = Control.SIZE_SHRINK_END
 	_header_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	row.add_child(_header_status)
 
 	_connect_button = _make_button("Forbind igen", false)
-	_connect_button.custom_minimum_size = Vector2(138, 38)
+	_connect_button.custom_minimum_size = Vector2(132, 38)
 	_connect_button.pressed.connect(_connect_backend)
 	row.add_child(_connect_button)
 	return panel
@@ -187,7 +269,10 @@ func _build_header() -> PanelContainer:
 
 func _build_sidebar() -> PanelContainer:
 	var panel := _make_panel(Color(0.075, 0.09, 0.10, 0.95), Color(0.35, 0.33, 0.27, 1.0))
-	panel.custom_minimum_size = Vector2(320, 0)
+	panel.name = "BriefingSidebar"
+	panel.custom_minimum_size = Vector2(292, 0)
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.size_flags_stretch_ratio = 0.25
 	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 
 	var margin := MarginContainer.new()
@@ -197,10 +282,18 @@ func _build_sidebar() -> PanelContainer:
 	margin.add_theme_constant_override("margin_bottom", 14)
 	panel.add_child(margin)
 
+	var sidebar_layout := VBoxContainer.new()
+	sidebar_layout.name = "SidebarLayout"
+	sidebar_layout.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	sidebar_layout.add_theme_constant_override("separation", 9)
+	margin.add_child(sidebar_layout)
+
 	var scroll := ScrollContainer.new()
+	scroll.name = "BriefingScroll"
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	margin.add_child(scroll)
+	sidebar_layout.add_child(scroll)
 
 	var column := VBoxContainer.new()
 	column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -208,81 +301,107 @@ func _build_sidebar() -> PanelContainer:
 	scroll.add_child(column)
 
 	column.add_child(_make_label("AKTIV SAG", 11, COLOR_GOLD, true))
-	_scenario_title_label = _make_label("Parisfredskonferencen", 21, COLOR_TEXT, true)
+	_scenario_title_label = _make_label("Parisfredskonferencen", 18, COLOR_TEXT, true)
 	column.add_child(_scenario_title_label)
 	_scenario_summary_label = _make_label(
 		"Henter scenariet fra CASES-backend …",
-		13,
+		12,
 		COLOR_MUTED
 	)
 	column.add_child(_scenario_summary_label)
 	column.add_child(_make_separator())
+	column.add_child(_make_label("DIN DELEGATION", 11, COLOR_GOLD, true))
+	_role_title_label = _make_label("Britisk rådgiver", 15, COLOR_TEXT, true)
+	column.add_child(_role_title_label)
+	_role_intro_label = _make_label(
+		"Rådgiv den britiske delegation. Samtalerne er simulerede.",
+		12,
+		COLOR_MUTED
+	)
+	column.add_child(_role_intro_label)
 
-	column.add_child(_make_label("FORBINDELSE", 11, COLOR_GOLD, true))
-	column.add_child(_make_label("Backend-adresse", 12, COLOR_MUTED))
+	var briefing_card := _make_panel(Color(0.13, 0.12, 0.095, 0.94), Color(0.49, 0.40, 0.24, 1.0))
+	briefing_card.name = "ObjectiveCard"
+	var briefing_margin := MarginContainer.new()
+	briefing_margin.add_theme_constant_override("margin_left", 12)
+	briefing_margin.add_theme_constant_override("margin_top", 10)
+	briefing_margin.add_theme_constant_override("margin_right", 12)
+	briefing_margin.add_theme_constant_override("margin_bottom", 10)
+	briefing_card.add_child(briefing_margin)
+	var briefing_column := VBoxContainer.new()
+	briefing_column.add_theme_constant_override("separation", 5)
+	briefing_margin.add_child(briefing_column)
+	briefing_column.add_child(_make_label("FORHANDLINGENS FOKUS", 10, COLOR_GOLD, true))
+	_briefing_tension_label = _make_label(
+		"Start forhandlingen for at se situationen.",
+		14,
+		COLOR_TEXT,
+		true
+	)
+	briefing_column.add_child(_briefing_tension_label)
+	_briefing_goal_label = _make_label("", 12, COLOR_MUTED)
+	briefing_column.add_child(_briefing_goal_label)
+	column.add_child(briefing_card)
+
+	_connection_details = VBoxContainer.new()
+	_connection_details.name = "ConnectionDetails"
+	_connection_details.visible = false
+	_connection_details.add_theme_constant_override("separation", 7)
+	column.add_child(_connection_details)
+	_connection_details.add_child(_make_label("BACKEND-ADRESSE", 10, COLOR_GOLD, true))
 	_endpoint_input = LineEdit.new()
 	_endpoint_input.text = _api_base_url
 	_endpoint_input.placeholder_text = "https://server.example.dk"
 	_endpoint_input.custom_minimum_size = Vector2(0, 38)
 	_endpoint_input.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	column.add_child(_endpoint_input)
+	_connection_details.add_child(_endpoint_input)
 	_sidebar_status = _make_label("Backend kontrolleres …", 12, COLOR_AMBER)
-	column.add_child(_sidebar_status)
+	_connection_details.add_child(_sidebar_status)
 	_narrator_status_label = _make_label("ChatGPT 6 Luna: kontrolleres …", 12, COLOR_MUTED)
-	column.add_child(_narrator_status_label)
+	_connection_details.add_child(_narrator_status_label)
 
-	column.add_child(_make_separator())
-	column.add_child(_make_label("DIN ROLLE", 11, COLOR_GOLD, true))
-	_role_title_label = _make_label("Britisk rådgiver", 15, COLOR_TEXT, true)
-	column.add_child(_role_title_label)
-	_role_intro_label = _make_label(
-		"Du er rådgiver ved fredsforhandlingerne. Spillets samtaler er en simulering.",
-		13,
-		COLOR_MUTED
-	)
-	column.add_child(_role_intro_label)
-
-	column.add_child(_make_separator())
-	_briefing_tension_label = _make_label(
-		"Start en forhandling for at hente åbningen og din briefing.",
-		13,
-		COLOR_TEXT
-	)
-	column.add_child(_briefing_tension_label)
-	_briefing_goal_label = _make_label("", 12, COLOR_MUTED)
-	column.add_child(_briefing_goal_label)
-
-	column.add_child(_make_separator())
-	_session_id_label = _make_label("Ingen gemt session valgt", 11, COLOR_MUTED)
-	column.add_child(_session_id_label)
+	var actions := VBoxContainer.new()
+	actions.name = "NegotiationActions"
+	actions.add_theme_constant_override("separation", 6)
+	sidebar_layout.add_child(actions)
+	_session_id_label = _make_label("Ingen aktiv forhandling", 11, COLOR_MUTED)
+	actions.add_child(_session_id_label)
 
 	_new_session_button = _make_button("Start ny forhandling", true)
 	_new_session_button.custom_minimum_size = Vector2(0, 42)
 	_new_session_button.pressed.connect(_start_new_session)
-	column.add_child(_new_session_button)
+	actions.add_child(_new_session_button)
 
 	_resume_button = _make_button("Genoptag gemt forhandling", false)
 	_resume_button.custom_minimum_size = Vector2(0, 38)
 	_resume_button.pressed.connect(_resume_saved_session)
-	column.add_child(_resume_button)
+	actions.add_child(_resume_button)
 
 	_retry_opening_button = _make_button("Prøv åbningen igen", false)
 	_retry_opening_button.custom_minimum_size = Vector2(0, 36)
 	_retry_opening_button.visible = false
 	_retry_opening_button.pressed.connect(_retry_opening)
-	column.add_child(_retry_opening_button)
+	actions.add_child(_retry_opening_button)
 
 	_retry_turn_button = _make_button("Prøv svaret igen", false)
 	_retry_turn_button.custom_minimum_size = Vector2(0, 36)
 	_retry_turn_button.visible = false
 	_retry_turn_button.pressed.connect(_retry_turn)
-	column.add_child(_retry_turn_button)
+	actions.add_child(_retry_turn_button)
+
+	_connection_toggle_button = _make_button("Vis teknisk status", false)
+	_connection_toggle_button.custom_minimum_size = Vector2(0, 34)
+	_connection_toggle_button.pressed.connect(_toggle_connection_details)
+	actions.add_child(_make_separator())
+	actions.add_child(_connection_toggle_button)
 	return panel
 
 
 func _build_conversation() -> PanelContainer:
 	var panel := _make_panel(Color(0.075, 0.09, 0.10, 0.92), Color(0.35, 0.33, 0.27, 1.0))
+	panel.name = "NegotiationPanel"
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.size_flags_stretch_ratio = 0.75
 	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 
 	var margin := MarginContainer.new()
@@ -300,55 +419,63 @@ func _build_conversation() -> PanelContainer:
 	top.add_theme_constant_override("separation", 10)
 	column.add_child(top)
 	var title_block := VBoxContainer.new()
-	title_block.custom_minimum_size = Vector2(380, 0)
-	title_block.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	title_block.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title_block.add_theme_constant_override("separation", 1)
 	title_block.add_child(_make_label("FORHANDLING", 14, COLOR_GOLD, true))
-	title_block.add_child(_make_label("Dine indlæg og CASES-simuleringens svar", 12, COLOR_MUTED))
+	title_block.add_child(_make_label("Fremsæt et forslag, og se hvordan de andre delegationer reagerer.", 12, COLOR_MUTED))
 	top.add_child(title_block)
-	var spacer := Control.new()
-	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	top.add_child(spacer)
-	_simulation_badge = _make_label("SIMULATION", 11, COLOR_AMBER, true)
-	_simulation_badge.custom_minimum_size = Vector2(190, 0)
-	_simulation_badge.size_flags_horizontal = Control.SIZE_SHRINK_END
+
+	var status_block := VBoxContainer.new()
+	status_block.custom_minimum_size = Vector2(204, 0)
+	status_block.size_flags_horizontal = Control.SIZE_SHRINK_END
+	status_block.add_theme_constant_override("separation", 2)
+	status_block.alignment = BoxContainer.ALIGNMENT_END
+	top.add_child(status_block)
+	_turn_status_label = _make_label("INGEN AKTIV RUNDE", 12, COLOR_GOLD, true)
+	_turn_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	status_block.add_child(_turn_status_label)
+	_simulation_badge = _make_label("SIMULERING", 10, COLOR_AMBER, true)
 	_simulation_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	top.add_child(_simulation_badge)
+	status_block.add_child(_simulation_badge)
 
 	var divider := _make_separator()
 	column.add_child(divider)
 
 	var transcript_scroll := ScrollContainer.new()
+	transcript_scroll.name = "TranscriptScroll"
 	transcript_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	transcript_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	transcript_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	column.add_child(transcript_scroll)
 
 	_transcript_column = VBoxContainer.new()
+	_transcript_column.name = "Transcript"
 	_transcript_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_transcript_column.add_theme_constant_override("separation", 9)
 	transcript_scroll.add_child(_transcript_column)
 	_add_message(
 		"VELKOMMEN",
-		"Forbind til backend for at hente den aktive Versailles-sag. "
-		+ "Når sessionen er klar, kan du skrive frit på dansk.",
+		"Vælg “Start ny forhandling” for at hente situationen og begynde første runde.",
 		"system"
 	)
 
 	_next_prompt_label = _make_label(
-		"Din næste handling bliver gemt som et idempotent indlæg og behandlet af backendens turn-worker.",
+		"Din næste handling bliver gemt og føjet til forhandlingen.",
 		12,
 		COLOR_MUTED
 	)
+	_next_prompt_label.name = "PromptHint"
 	_next_prompt_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	column.add_child(_next_prompt_label)
 
-	var composer_row := HBoxContainer.new()
-	composer_row.add_theme_constant_override("separation", 10)
-	column.add_child(composer_row)
+	_composer_row = HBoxContainer.new()
+	_composer_row.name = "ComposerRow"
+	_composer_row.add_theme_constant_override("separation", 10)
+	column.add_child(_composer_row)
 
 	_composer = TextEdit.new()
-	_composer.custom_minimum_size = Vector2(0, 96)
+	_composer.name = "ProposalComposer"
+	_composer.custom_minimum_size = Vector2(0, 82)
 	_composer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_composer.placeholder_text = "Skriv dit forslag, din indsigelse eller dit spørgsmål …"
 	_composer.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
@@ -362,12 +489,56 @@ func _build_conversation() -> PanelContainer:
 		"focus",
 		_make_style(Color(0.045, 0.058, 0.066, 0.98), COLOR_GOLD, 8)
 	)
-	composer_row.add_child(_composer)
+	_composer_row.add_child(_composer)
 
-	_send_button = _make_button("Send\nindlæg", true)
-	_send_button.custom_minimum_size = Vector2(112, 96)
+	_send_button = _make_button("Send forslag", true)
+	_send_button.name = "SendProposalButton"
+	_send_button.tooltip_text = "Send dit forslag til den aktive forhandling."
+	_send_button.custom_minimum_size = Vector2(136, 82)
 	_send_button.pressed.connect(_submit_turn)
-	composer_row.add_child(_send_button)
+	_composer_row.add_child(_send_button)
+
+	_complete_button = _make_button("Afslut forløb", false)
+	_complete_button.name = "CompleteSessionButton"
+	_complete_button.tooltip_text = "Afslut forhandlingen og gå til refleksionen."
+	_complete_button.custom_minimum_size = Vector2(132, 82)
+	_complete_button.pressed.connect(_complete_session)
+	_composer_row.add_child(_complete_button)
+
+	_results_panel = _make_panel(Color(0.085, 0.11, 0.105, 0.96), Color(0.38, 0.53, 0.41, 1.0))
+	_results_panel.name = "ResultsReflectionPanel"
+	_results_panel.custom_minimum_size = Vector2(0, 184)
+	_results_panel.visible = false
+	column.add_child(_results_panel)
+	var results_margin := MarginContainer.new()
+	results_margin.add_theme_constant_override("margin_left", 14)
+	results_margin.add_theme_constant_override("margin_top", 10)
+	results_margin.add_theme_constant_override("margin_right", 14)
+	results_margin.add_theme_constant_override("margin_bottom", 10)
+	_results_panel.add_child(results_margin)
+	var results_column := VBoxContainer.new()
+	results_column.add_theme_constant_override("separation", 6)
+	results_margin.add_child(results_column)
+	_results_status_label = _make_label("Afsluttende resultat", 12, COLOR_GOLD, true)
+	_results_status_label.name = "ReflectionStatus"
+	results_column.add_child(_results_status_label)
+	_results_scroll = ScrollContainer.new()
+	_results_scroll.name = "ResultsScroll"
+	_results_scroll.custom_minimum_size = Vector2(0, 112)
+	_results_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_results_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	results_column.add_child(_results_scroll)
+	_results_content = VBoxContainer.new()
+	_results_content.name = "ResultsContent"
+	_results_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_results_content.add_theme_constant_override("separation", 8)
+	_results_scroll.add_child(_results_content)
+	_retry_reflection_button = _make_button("Prøv refleksionen igen", false)
+	_retry_reflection_button.name = "RetryReflectionButton"
+	_retry_reflection_button.custom_minimum_size = Vector2(0, 34)
+	_retry_reflection_button.visible = false
+	_retry_reflection_button.pressed.connect(_request_reflection)
+	results_column.add_child(_retry_reflection_button)
 	return panel
 
 
@@ -396,7 +567,9 @@ func _make_separator() -> HSeparator:
 
 func _make_panel(background: Color, border: Color) -> PanelContainer:
 	var panel := PanelContainer.new()
-	panel.add_theme_stylebox_override("panel", _make_style(background, border, 12))
+	var hud_background := background
+	hud_background.a = minf(hud_background.a, 0.82)
+	panel.add_theme_stylebox_override("panel", _make_style(hud_background, border, 12))
 	return panel
 
 
@@ -515,6 +688,7 @@ func _connect_backend() -> void:
 	_set_status("Backend og database er klar.", "ok")
 	_sidebar_status.text = "Forbundet · %s" % _api_base_url
 	_sidebar_status.add_theme_color_override("font_color", COLOR_GREEN)
+	_update_session_label()
 	_set_busy(false)
 
 
@@ -533,7 +707,14 @@ func _is_safe_endpoint(value: String) -> bool:
 
 func _update_scenario_labels() -> void:
 	var metadata: Dictionary = _scenario.get("metadata", {})
-	_scenario_title_label.text = str(metadata.get("title", "Parisfredskonferencen"))
+	var full_title := str(metadata.get("title", "Parisfredskonferencen")).strip_edges()
+	var title_separator := full_title.find(":")
+	_scenario_title_label.text = (
+		full_title.substr(0, title_separator).strip_edges()
+		if title_separator >= 0
+		else full_title
+	)
+	_scenario_title_label.tooltip_text = full_title
 	_scenario_summary_label.text = str(
 		metadata.get("summary", "Forhandlinger ved fredskonferencen i Paris i 1919.")
 	)
@@ -551,6 +732,7 @@ func _update_scenario_labels() -> void:
 				"Du er rådgiver ved fredsforhandlingerne i Paris."
 			)
 		)
+		_role_intro_label.add_theme_font_size_override("font_size", 12)
 	else:
 		_role_title_label.text = "Den faste britiske rolle mangler"
 		_role_intro_label.text = "Backend-scenariet indeholder ikke den forventede spillerrolle."
@@ -563,6 +745,12 @@ func _start_new_session() -> void:
 		_set_status("Genoptag først den igangværende oprettelse.", "error")
 		return
 
+	_session_completed = false
+	_reflection_retry_pending = false
+	_reflection_failed_permanently = false
+	_reflection_loading = false
+	_reflection_error = ""
+	_reflection_result = {}
 	var record := {
 		"local_id": _make_uuid(),
 		"session_id": "",
@@ -573,6 +761,8 @@ func _start_new_session() -> void:
 		"capability": _make_capability(),
 		"pending_turn": {},
 		"pending_request_id": "",
+		"reflection": {},
+		"pending_completion": {},
 	}
 	var sessions: Array = _store.get("sessions", [])
 	sessions.append(record)
@@ -647,6 +837,8 @@ func _create_session(record: Dictionary) -> bool:
 
 
 func _restore_session(record: Dictionary) -> void:
+	_reflection_retry_pending = false
+	_reflection_failed_permanently = false
 	var session_id := str(record.get("session_id", ""))
 	var capability := str(record.get("capability", ""))
 	if session_id.is_empty() or capability.is_empty():
@@ -671,6 +863,8 @@ func _restore_session(record: Dictionary) -> void:
 		return
 	_session_snapshot = session_response.get("data", {})
 	_current_turn_number = int(_session_snapshot.get("turn_number", 0))
+	var cached_reflection: Variant = record.get("reflection", {})
+	_reflection_result = cached_reflection if cached_reflection is Dictionary else {}
 
 	var initialization: Dictionary = await _api.call(
 		"get_json",
@@ -722,6 +916,16 @@ func _restore_session(record: Dictionary) -> void:
 		_set_status("Ukendt status fra backend: %s" % init_status, "error")
 		_operation_in_progress = false
 		_update_controls()
+		return
+	if _session_completed:
+		var pending_completion: Variant = record.get("pending_completion", {})
+		if pending_completion is Dictionary and not pending_completion.is_empty():
+			record["pending_completion"] = {}
+			_save_store()
+		_operation_in_progress = false
+		_render_transcript()
+		_update_controls()
+		await _request_reflection()
 		return
 
 	await _resume_pending_turn(record, _session_snapshot.get("pending_request", {}))
@@ -803,9 +1007,14 @@ func _retry_opening() -> void:
 
 func _resume_pending_turn(record: Dictionary, server_pending: Variant) -> void:
 	if _session_completed:
-		_set_status("Forhandlingen er afsluttet.", "ok")
+		var pending_completion: Variant = record.get("pending_completion", {})
+		if pending_completion is Dictionary and not pending_completion.is_empty():
+			record["pending_completion"] = {}
+			_save_store()
 		_operation_in_progress = false
+		_render_transcript()
 		_update_controls()
+		await _request_reflection()
 		return
 
 	var saved_request_id := str(record.get("pending_request_id", ""))
@@ -842,6 +1051,11 @@ func _resume_pending_turn(record: Dictionary, server_pending: Variant) -> void:
 		record["external_request_retryable"] = false
 		_save_store()
 		await _poll_turn_request(record, _latest_turn_request_id, false)
+		return
+
+	var pending_completion: Variant = record.get("pending_completion", {})
+	if pending_completion is Dictionary and not pending_completion.is_empty():
+		await _send_completion(record, pending_completion)
 		return
 
 	_set_status("Sessionen er genoptaget.", "ok")
@@ -997,6 +1211,17 @@ func _poll_turn_request(
 			_retry_turn_button.visible = false
 			_operation_in_progress = false
 			_update_controls()
+			if _session_completed:
+				var pending_completion: Variant = record.get("pending_completion", {})
+				if pending_completion is Dictionary and not pending_completion.is_empty():
+					record["pending_completion"] = {}
+					_save_store()
+				await _request_reflection()
+				return
+			var pending_completion: Variant = record.get("pending_completion", {})
+			if pending_completion is Dictionary and not pending_completion.is_empty():
+				await _send_completion(record, pending_completion)
+				return
 			return
 		if status == "retryable_failure":
 			var failure: Dictionary = data.get("failure", {})
@@ -1099,6 +1324,187 @@ func _retry_turn() -> void:
 	_retry_turn_button.visible = false
 	_set_actor_talking(true)
 	await _poll_turn_request(record, _latest_turn_request_id, request_is_local)
+
+
+func _complete_session() -> void:
+	if _operation_in_progress or not _backend_ready or _session_completed:
+		return
+	var record := _current_record()
+	if record.is_empty() or str(record.get("session_id", "")).is_empty():
+		return
+	if _opening.is_empty():
+		_set_status("Åbningen skal være klar, før forløbet kan afsluttes.", "error")
+		return
+	var pending: Variant = record.get("pending_completion", {})
+	if not (pending is Dictionary) or pending.is_empty():
+		pending = {
+			"client_turn_id": _make_uuid(),
+			"expected_turn": _current_turn_number,
+		}
+		record["pending_completion"] = pending
+		_save_store()
+	await _send_completion(record, pending)
+
+
+func _send_completion(record: Dictionary, pending: Dictionary) -> void:
+	if not _operation_in_progress:
+		_operation_in_progress = true
+		_update_controls()
+	var client_turn_id := str(pending.get("client_turn_id", ""))
+	if client_turn_id.is_empty():
+		pending["client_turn_id"] = _make_uuid()
+		client_turn_id = str(pending["client_turn_id"])
+		pending["expected_turn"] = _current_turn_number
+		record["pending_completion"] = pending
+		_save_store()
+	var payload := {
+		"client_turn_id": client_turn_id,
+		"expected_turn": int(pending.get("expected_turn", _current_turn_number)),
+	}
+	var response: Dictionary = await _api.call(
+		"post_json",
+		"/api/v1/sessions/%s/completion" % str(record.get("session_id", "")),
+		payload,
+		str(record.get("capability", "")),
+		{"Idempotency-Key": client_turn_id}
+	)
+	if not response.get("ok", false):
+		var response_data: Variant = response.get("data", {})
+		if int(response.get("status", 0)) == 409 and response_data is Dictionary:
+			var conflicting_request_id := str(response_data.get("request_id", ""))
+			if not conflicting_request_id.is_empty():
+				_latest_turn_request_id = conflicting_request_id
+				record["pending_request_id"] = conflicting_request_id
+				record["pending_request_is_external"] = true
+				record["external_request_retryable"] = false
+				_save_store()
+				_set_status("En anden tur afsluttes først. Afslutningen fortsætter bagefter …", "working")
+				await _poll_turn_request(record, conflicting_request_id, false)
+				return
+			if str(response.get("error", "")).contains("Expected turn does not match session"):
+				var refreshed := await _refresh_authoritative_state(record, false)
+				if refreshed and _session_completed:
+					record["pending_completion"] = {}
+					_save_store()
+					_operation_in_progress = false
+					_render_transcript()
+					_update_controls()
+					await _request_reflection()
+					return
+				if refreshed:
+					pending["expected_turn"] = _current_turn_number
+					pending["client_turn_id"] = _make_uuid()
+					record["pending_completion"] = pending
+					_save_store()
+			_set_status(
+				"Afslutningen blev ikke bekræftet: %s. Prøv afslutningen igen; den gemte anmodning genbruges sikkert."
+				% response.get("error", "Ukendt fejl"),
+				"error"
+			)
+		_operation_in_progress = false
+		_update_controls()
+		return
+
+	var refreshed := await _refresh_authoritative_state(record, false)
+	if not refreshed:
+		_set_status("Afslutningen blev gemt, men kunne ikke genindlæses. Genoptag sessionen for at kontrollere.", "error")
+		_operation_in_progress = false
+		_update_controls()
+		return
+	if not _session_completed:
+		_set_status("Backend bekræftede ikke, at forløbet er afsluttet. Genoptag sessionen for at kontrollere.", "error")
+		_operation_in_progress = false
+		_update_controls()
+		return
+	record["pending_completion"] = {}
+	_save_store()
+	_operation_in_progress = false
+	_render_transcript()
+	_set_status("Forhandlingen er afsluttet. Refleksionen hentes nu …", "ok")
+	await _request_reflection()
+
+
+func _request_reflection() -> void:
+	if _operation_in_progress or not _backend_ready or not _session_completed:
+		return
+	var record := _current_record()
+	if record.is_empty():
+		return
+	var saved_reflection: Variant = record.get("reflection", {})
+	if saved_reflection is Dictionary and str(saved_reflection.get("status", "")) == "ready":
+		_reflection_retry_pending = false
+		_reflection_failed_permanently = false
+		_reflection_result = saved_reflection
+		_render_results()
+		_set_status("Den afsluttende refleksion er klar.", "ok")
+		return
+
+	_reflection_loading = true
+	_reflection_error = ""
+	_operation_in_progress = true
+	_update_controls()
+	_render_results()
+	_set_status("Henter den afsluttende refleksion …", "working")
+	var session_id := str(record.get("session_id", ""))
+	var response: Dictionary = await _api.call(
+		"post_json",
+		"/api/v1/sessions/%s/reflection" % session_id,
+		null,
+		str(record.get("capability", "")),
+		{},
+		REFLECTION_REQUEST_TIMEOUT_SECONDS
+	)
+	if not response.get("ok", false):
+		var status_code := int(response.get("status", 0))
+		_reflection_retry_pending = (
+			status_code == 0 or status_code == 408 or status_code == 429 or status_code >= 500
+		)
+		_reflection_failed_permanently = not _reflection_retry_pending
+		_reflection_error = str(response.get("error", "Ukendt fejl"))
+		_reflection_loading = false
+		var retry_message := " Du kan prøve igen." if _reflection_retry_pending else ""
+		_set_status(
+			"Den afsluttende refleksion kunne ikke hentes: %s.%s"
+			% [response.get("error", "Ukendt fejl"), retry_message],
+			"error"
+		)
+		_operation_in_progress = false
+		_render_results()
+		_update_controls()
+		return
+
+	var reflection_data: Variant = response.get("data", {})
+	if (
+		not reflection_data is Dictionary
+		or str(reflection_data.get("status", "")) != "ready"
+		or str(reflection_data.get("summary", "")).strip_edges().is_empty()
+	):
+		_reflection_retry_pending = true
+		_reflection_failed_permanently = false
+		_reflection_loading = false
+		_reflection_error = "Backend returnerede ikke en komplet refleksion."
+		_set_status(
+			"Backend returnerede ikke en komplet refleksion. Du kan prøve igen.",
+			"error"
+		)
+		_operation_in_progress = false
+		_render_results()
+		_update_controls()
+		return
+
+	record["reflection"] = reflection_data
+	_reflection_result = reflection_data
+	_reflection_retry_pending = false
+	_reflection_failed_permanently = false
+	_reflection_loading = false
+	_reflection_error = ""
+	_save_store()
+	_operation_in_progress = false
+	_render_results()
+	_set_status("Den afsluttende refleksion er klar.", "ok")
+	_update_controls()
+	if is_inside_tree():
+		call_deferred("_scroll_results_to_end")
 
 
 func _refresh_authoritative_state(
@@ -1206,6 +1612,8 @@ func _render_transcript() -> void:
 				if not (line is Dictionary):
 					continue
 				var actor_id := str(line.get("actor_id", "")).strip_edges()
+				if _delegate_players.has(actor_id):
+					_active_delegate_id = actor_id
 				var dialogue_text := str(line.get("text", "")).strip_edges()
 				if not actor_id.is_empty() and not dialogue_text.is_empty():
 					_add_message(
@@ -1219,13 +1627,15 @@ func _render_transcript() -> void:
 		if not outcome.is_empty():
 			_add_message("UDVIKLING", outcome, "system")
 
-	if not _turns.is_empty():
+	if _session_completed:
+		_next_prompt_label.text = "Forhandlingen er afsluttet. Se resultatet og refleksionen nedenfor."
+	elif not _turns.is_empty():
 		var latest: Dictionary = _turns[_turns.size() - 1]
-		_next_prompt_label.text = str(
-			latest.get(
-				"next_player_prompt",
-				"Du kan fortsætte forhandlingen med et nyt indlæg."
-			)
+		var next_prompt: Variant = latest.get("next_player_prompt")
+		_next_prompt_label.text = (
+			str(next_prompt).strip_edges()
+			if next_prompt is String and not str(next_prompt).strip_edges().is_empty()
+			else "Du kan fortsætte forhandlingen med et nyt indlæg."
 		)
 	elif not _opening.is_empty():
 		_next_prompt_label.text = str(
@@ -1234,7 +1644,13 @@ func _render_transcript() -> void:
 	else:
 		_next_prompt_label.text = "Åbningen vises her, når backendens initialiseringsjob er færdigt."
 
+	_update_session_label()
+	if _composer_row != null:
+		_composer_row.visible = not _session_completed
+	_render_results()
 	_update_controls()
+	if is_inside_tree():
+		call_deferred("_scroll_transcript_to_end")
 
 
 func _add_message(speaker: String, message: String, tone: String) -> void:
@@ -1251,6 +1667,9 @@ func _add_message(speaker: String, message: String, tone: String) -> void:
 		line_color = Color(0.45, 0.39, 0.27, 1.0)
 
 	var card := _make_panel(card_color, line_color)
+	var accent_style := _make_style(card_color, line_color, 10)
+	accent_style.border_width_left = 3
+	card.add_theme_stylebox_override("panel", accent_style)
 	var margin := MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", 12)
 	margin.add_theme_constant_override("margin_top", 9)
@@ -1260,16 +1679,202 @@ func _add_message(speaker: String, message: String, tone: String) -> void:
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 5)
 	margin.add_child(column)
-	column.add_child(_make_label(speaker, 10, COLOR_GOLD, true))
-	var body := _make_label(message, 13, COLOR_TEXT)
+	column.add_child(_make_label(speaker, 11, COLOR_GOLD, true))
+	var body := _make_label(message, 14, COLOR_TEXT)
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	column.add_child(body)
 	_transcript_column.add_child(card)
 
 
+func _render_results() -> void:
+	if _results_panel == null or _results_content == null:
+		return
+	_results_panel.visible = _session_completed
+	for child in _results_content.get_children():
+		_results_content.remove_child(child)
+		child.queue_free()
+	if not _session_completed:
+		return
+
+	var record := _current_record()
+	var cached_reflection: Variant = record.get("reflection", {})
+	var reflection := _reflection_result
+	if cached_reflection is Dictionary and str(cached_reflection.get("status", "")) == "ready":
+		reflection = cached_reflection
+		_reflection_result = cached_reflection
+	var is_ready := str(reflection.get("status", "")) == "ready"
+	if _reflection_loading:
+		_results_status_label.text = "AFSLUTTET · HENTER REFLEKSION …"
+	elif not _reflection_error.is_empty():
+		_results_status_label.text = (
+			"AFSLUTTET · REFLEKSIONEN KUNNE IKKE HENTES · PRØV IGEN"
+			if _reflection_retry_pending
+			else "AFSLUTTET · REFLEKSIONEN KUNNE IKKE HENTES"
+		)
+	elif is_ready:
+		_results_status_label.text = "AFSLUTTET · KVALITATIV REFLEKSION · INGEN KARAKTER"
+	else:
+		_results_status_label.text = "AFSLUTTET · KVALITATIV REFLEKSION"
+
+	var state: Dictionary = _session_snapshot.get("state", {})
+	var completion_reason := str(state.get("completion_reason", ""))
+	var completion_line := "Forhandlingen er afsluttet."
+	if completion_reason == "player_end":
+		completion_line = "Du valgte at afslutte forløbet."
+	elif completion_reason == "objectives_complete":
+		completion_line = "Scenariets afslutningsmål blev nået."
+	elif completion_reason == "turn_limit":
+		completion_line = "Scenariets turgrænse blev nået."
+	var turn_count := int(_session_snapshot.get("turn_number", _current_turn_number))
+	_add_result_section(
+		"FORLØBETS AFSLUTNING",
+		"%s Registrerede ture: %d." % [completion_line, turn_count]
+	)
+	if not _turns.is_empty():
+		var final_turn: Variant = _turns[_turns.size() - 1]
+		if final_turn is Dictionary:
+			var final_reply := str(final_turn.get("reply", "")).strip_edges()
+			var final_summary := str(final_turn.get("outcome_summary", "")).strip_edges()
+			var ending_lines := PackedStringArray()
+			if not final_reply.is_empty():
+				ending_lines.append(final_reply)
+			if not final_summary.is_empty():
+				ending_lines.append(final_summary)
+			if not ending_lines.is_empty():
+				_add_result_section(
+					"SIDSTE SVAR",
+					"\n\n".join(ending_lines)
+				)
+	if not _reflection_error.is_empty():
+		var error_text := _reflection_error
+		if _reflection_retry_pending:
+			error_text += "\nForsøget fejlede midlertidigt. Brug knappen nedenfor for at prøve igen."
+		_add_result_section("REFLEKSION", error_text)
+		return
+	if not is_ready:
+		_add_result_section("REFLEKSION", "Refleksionen vises her, når backend har færdiggjort den.")
+		return
+
+	var reflection_summary := str(reflection.get("summary", "")).strip_edges()
+	if not reflection_summary.is_empty():
+		_add_result_section("REFLEKSION", reflection_summary)
+
+	var choices: Variant = reflection.get("player_choices", [])
+	if choices is Array and not choices.is_empty():
+		var choice_lines := PackedStringArray()
+		for choice in choices:
+			if not (choice is Dictionary):
+				continue
+			var action := str(choice.get("action", "")).strip_edges()
+			var choice_summary := str(choice.get("summary", "")).strip_edges()
+			var choice_line := "Tur %d" % int(choice.get("turn_number", 0))
+			if not action.is_empty():
+				choice_line += " · " + action
+			if not choice_summary.is_empty():
+				choice_line += "\n" + choice_summary
+			choice_lines.append(choice_line)
+		if not choice_lines.is_empty():
+			_add_result_section("DINE VALG", "\n\n".join(choice_lines))
+
+	var consequences: Variant = reflection.get("simulated_consequences", [])
+	if consequences is Array and not consequences.is_empty():
+		var consequence_lines := PackedStringArray()
+		for consequence in consequences:
+			if not (consequence is Dictionary):
+				continue
+			var details: Variant = consequence.get("details", {})
+			if not (details is Dictionary):
+				continue
+			var detail := str(details.get("summary", details.get("resolution", details.get("reason", "")))).strip_edges()
+			if not detail.is_empty():
+				consequence_lines.append("Tur %d · %s" % [int(consequence.get("turn_number", 0)), detail])
+		if not consequence_lines.is_empty():
+			_add_result_section("SIMULEREDE FØLGER", "\n".join(consequence_lines))
+
+	var objectives: Variant = reflection.get("objectives", [])
+	if objectives is Array:
+		var objective_lines := PackedStringArray()
+		for objective in objectives:
+			if not (objective is Dictionary):
+				continue
+			var objective_name := str(objective.get("title", objective.get("id", "Læringsmål")))
+			var feedback := str(objective.get("reflection", "")).strip_edges()
+			if not feedback.is_empty():
+				objective_lines.append("%s\n%s" % [objective_name, feedback])
+		if not objective_lines.is_empty():
+			_add_result_section("LÆRINGSMÅL", "\n\n".join(objective_lines))
+
+	var evidence_ids: Variant = reflection.get("historical_evidence_ids", [])
+	var comparison := str(reflection.get("historical_comparison", "")).strip_edges()
+	if evidence_ids is Array and not evidence_ids.is_empty() and not comparison.is_empty():
+		_add_result_section("HISTORISK SAMMENLIGNING", comparison)
+		var source_titles := PackedStringArray()
+		var sources: Variant = reflection.get("sources", [])
+		if sources is Array:
+			for source in sources:
+				if source is Dictionary:
+					var source_title := str(source.get("source_title", "")).strip_edges()
+					if not source_title.is_empty():
+						source_titles.append(source_title)
+		if not source_titles.is_empty():
+			_add_result_section("KILDER", "\n".join(source_titles))
+	else:
+		var abstention := str(reflection.get("historical_abstention", "")).strip_edges()
+		if abstention.is_empty():
+			match str(reflection.get("evidence_status", "")):
+				"evidence_unavailable":
+					abstention = "Der var ikke godkendt historisk belæg til en sammenligning."
+				"retrieval_failure":
+					abstention = "Kildesøgningen fejlede; den historiske sammenligning er uafklaret."
+				_:
+					abstention = "Ingen kildebaseret historisk sammenligning blev returneret."
+		_add_result_section("KILDESTATUS", abstention)
+
+	var uncertainty_notes: Variant = reflection.get("uncertainty_notes", [])
+	if uncertainty_notes is Array and not uncertainty_notes.is_empty():
+		var notes := PackedStringArray()
+		for note in uncertainty_notes:
+			var note_text := str(note).strip_edges()
+			if not note_text.is_empty():
+				notes.append("• " + note_text)
+		if not notes.is_empty():
+			_add_result_section("USIKKERHED OG BEGRÆNSNINGER", "\n".join(notes))
+	_add_result_section(
+		"OM REFLEKSIONEN",
+		"Dette er en kvalitativ refleksion over den simulerede forhandling. Den giver ingen karakter eller vurdering af mestring."
+	)
+
+
+func _add_result_section(heading: String, body: String) -> void:
+	if body.strip_edges().is_empty():
+		return
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 4)
+	column.add_child(_make_label(heading, 11, COLOR_GOLD, true))
+	var label := _make_label(body, 13, COLOR_TEXT)
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	column.add_child(label)
+	_results_content.add_child(column)
+
+
+func _scroll_results_to_end() -> void:
+	await get_tree().process_frame
+	if _results_scroll != null:
+		_results_scroll.scroll_vertical = int(_results_scroll.get_v_scroll_bar().max_value)
+
+
+func _scroll_transcript_to_end() -> void:
+	await get_tree().process_frame
+	if _transcript_column == null:
+		return
+	var scroll := _transcript_column.get_parent() as ScrollContainer
+	if scroll != null:
+		scroll.scroll_vertical = int(scroll.get_v_scroll_bar().max_value)
+
+
 func _update_briefing_labels() -> void:
 	if _opening.is_empty():
-		_briefing_tension_label.text = "Start en forhandling for at hente åbningen og din briefing."
+		_briefing_tension_label.text = "Start forhandlingen for at se situationen."
 		_briefing_goal_label.text = ""
 		_simulation_badge.text = "SIMULATION"
 		return
@@ -1281,18 +1886,25 @@ func _update_briefing_labels() -> void:
 
 
 func _update_session_label() -> void:
+	if _turn_status_label != null:
+		if _session_completed:
+			_turn_status_label.text = "FORHANDLINGEN ER AFSLUTTET"
+		elif not _opening.is_empty():
+			_turn_status_label.text = "RUNDE %02d · DIN TUR" % maxi(1, _current_turn_number + 1)
+		elif not _backend_ready:
+			_turn_status_label.text = "AFVENTER FORBINDELSE"
+		else:
+			_turn_status_label.text = "KLAR TIL AT STARTE"
+
 	var record := _current_record()
 	if record.is_empty():
-		_session_id_label.text = "Ingen gemt session valgt"
+		_session_id_label.text = "Ingen aktiv forhandling"
 		return
 	var session_id := str(record.get("session_id", ""))
 	if session_id.is_empty():
-		_session_id_label.text = "Session-oprettelse kan genoptages"
+		_session_id_label.text = "Forhandling oprettes · kan genoptages"
 	else:
-		_session_id_label.text = "Session · %s · tur %d" % [
-			session_id.substr(0, mini(8, session_id.length())),
-			_current_turn_number,
-		]
+		_session_id_label.text = "Forhandling · tur %d" % _current_turn_number
 
 
 func _update_controls() -> void:
@@ -1318,6 +1930,27 @@ func _update_controls() -> void:
 		and bool(record.get("external_request_retryable", false))
 	)
 	_retry_turn_button.disabled = _operation_in_progress or not _backend_ready
+	if _complete_button != null:
+		var pending_completion: Variant = record.get("pending_completion", {})
+		var completion_pending := false
+		if pending_completion is Dictionary:
+			completion_pending = not (pending_completion as Dictionary).is_empty()
+		_complete_button.text = "Genforsøg afslutning" if completion_pending else "Afslut forløb"
+		_complete_button.disabled = (
+			_operation_in_progress
+			or not _backend_ready
+			or not has_session
+			or _opening.is_empty()
+			or _session_completed
+			or external_retry_pending
+		)
+	if _composer_row != null:
+		_composer_row.visible = not _session_completed
+	if _retry_reflection_button != null:
+		_retry_reflection_button.visible = (
+			_session_completed and _reflection_retry_pending and not _reflection_failed_permanently
+		)
+		_retry_reflection_button.disabled = _operation_in_progress or not _backend_ready
 	if _send_button != null:
 		_send_button.disabled = (
 			_operation_in_progress
@@ -1342,29 +1975,50 @@ func _set_busy(value: bool) -> void:
 	_update_controls()
 
 
+func _toggle_connection_details() -> void:
+	if _connection_details == null:
+		return
+	_connection_details.visible = not _connection_details.visible
+	_connection_toggle_button.text = (
+		"Skjul teknisk status" if _connection_details.visible else "Vis teknisk status"
+	)
+
+
 func _set_status(message: String, state: String) -> void:
 	if _header_status == null:
 		return
-	_header_status.text = message
 	var color := COLOR_MUTED
+	var short_status := "STATUS · VENTER"
 	match state:
 		"ok":
 			color = COLOR_GREEN
+			short_status = "STATUS · FORBUNDET"
+			_connect_button.text = "Kontrollér igen"
 		"working":
 			color = COLOR_AMBER
+			short_status = "STATUS · ARBEJDER"
+			_connect_button.text = "Forbind igen"
 		"error":
 			color = COLOR_RED
+			short_status = "STATUS · PROBLEM"
+			_connect_button.text = "Forbind igen"
+	_header_status.text = short_status
+	_header_status.tooltip_text = message
 	_header_status.add_theme_color_override("font_color", color)
 	if _sidebar_status != null:
 		_sidebar_status.text = message
 		_sidebar_status.add_theme_color_override("font_color", color)
+	if _connection_toggle_button != null:
+		_connection_toggle_button.tooltip_text = message
+		_connection_toggle_button.add_theme_color_override("font_color", color)
 
 
 func _set_actor_talking(talking: bool) -> void:
-	var preview := get_node_or_null("SeatedNegotiatorPreview")
-	if preview == null or not preview.has_method("set_animation"):
-		return
-	preview.call("set_animation", "SeatedTalking" if talking else "SeatedIdle")
+	for actor_id in _delegate_players:
+		var player: AnimationPlayer = _delegate_players[actor_id]
+		var clip := "SeatedTalking" if talking and actor_id == _active_delegate_id else "SeatedIdle"
+		if player != null and player.has_animation(clip):
+			player.play(clip, 0.25)
 
 
 func _clear_pending_turn(record: Dictionary, clear_composer: bool) -> void:
