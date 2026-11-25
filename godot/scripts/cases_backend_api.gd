@@ -3,7 +3,7 @@ extends Node
 ## Thin JSON client for the CASES v2 REST API. Session capabilities are sent only
 ## in Authorization headers and are never printed or included in URLs.
 
-var base_url: String = "http://127.0.0.1:18081"
+var base_url: String = "http://127.0.0.1:18082"
 
 var _http: HTTPRequest
 var _in_flight := false

@@ -9,7 +9,7 @@ const SCENARIO_SLUG := "versailles-1919"
 const PLAYER_ROLE_ID := "british_adviser"
 const NARRATOR_ID := "gpt6_luna_high"
 const SESSION_STORE_PATH := "user://cases_sessions.json"
-const DEFAULT_BACKEND_URL := "http://127.0.0.1:18081"
+const DEFAULT_BACKEND_URL := "http://127.0.0.1:18082"
 const INITIALIZATION_POLL_LIMIT := 180
 const TURN_POLL_LIMIT := 360
 

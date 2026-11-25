@@ -4,13 +4,16 @@
 
 The default Godot project now opens the network client in `godot/scenes/game_client.tscn`. The previous seated character preview remains available as `res://scenes/seated_suit_demo.tscn`.
 
-Start the CASES backend deployment separately before opening Godot. The default API URL is `http://127.0.0.1:18081`, matching the API port currently published on Marcus_Computer. Use the URL field and **Connect** in the client if the backend runs elsewhere. For a remote server, use HTTPS. You can also set `CASES_API_BASE_URL` before launching Godot.
+Use [Cases-Startup](https://github.com/IdehistorieCases/Cases-Startup) as the demo launcher. After setup and one-time Luna consent in the dashboard, run `.\cases.ps1 start` from the Cases-Startup checkout. It starts the model services and backend, then launches Godot with the selected backend URL in `CASES_API_BASE_URL`. The default backend port is `18082`, matching the GUI default.
 
-From the repository root in PowerShell:
+For manual GUI debugging, first start the backend and set the URL to its actual host port. Example for the default Cases-Startup stack:
 
 ```powershell
+$env:CASES_API_BASE_URL = 'http://127.0.0.1:18082'
 & 'D:\tools\Godot-4.7.2\Godot_v4.7.2-stable_win64.exe' --path godot
 ```
+
+`CASES_API_BASE_URL` overrides the URL saved by the GUI. You can also change the endpoint in the GUI and press **Connect**. Use HTTPS for remote servers.
 
 The client checks `/healthz`, `/readyz`, `/api/v1/scenarios/versailles-1919`, and `/api/v1/narrators` when it connects. Session creation requires API and database readiness. Narrator readiness is displayed separately: if inference is unavailable, the client does not fabricate an opening and offers a retry for the failed initialization.
 

@@ -16,9 +16,11 @@ Every persona profile is validated before the generator edits the Blender scene 
 
 Face shape is applied through one `transform_face_point()` mapping shared by the head surface and attached hair, eye, brow, pupil, and facial-hair landmarks. The senior mediator uses two overlapping, skinned jacket fronts with two columns of buttons for a double-breasted construction.
 
-## Run the Godot client
+## Run the connected game
 
-From the repository root, open `godot/project.godot` in Godot 4.7.2 and run the main scene. The main scene connects to the backend at `http://127.0.0.1:18081`; start the backend deployment first. The endpoint is editable in the client, or can be set with `CASES_API_BASE_URL`. Use HTTPS for remote backends.
+Use [Cases-Startup](https://github.com/IdehistorieCases/Cases-Startup) for the demo. It pins the matching Cases-AI, Cases-Backend, and Cases-GUI revisions, starts the services in order, and launches Godot with the configured backend URL. Its default backend port is `18082`, passed to the GUI as `CASES_API_BASE_URL`.
+
+For manual GUI debugging, open `godot/project.godot` in Godot 4.7.2 and run the main scene. The client default is `http://127.0.0.1:18082`. If your backend uses another port, set `CASES_API_BASE_URL` before launching or edit the endpoint in the GUI. The environment variable overrides a previously saved endpoint. Use HTTPS for remote backends.
 
 The first connected flow loads the Versailles scenario, opens or resumes a session, displays the backend-generated opening, and sends Danish text turns. Current scope is one scenario, one fixed British role, and text input. See [the integration guide](docs/GODOT_BACKEND_INTEGRATION.md) for endpoints, session recovery, and limits.
 
