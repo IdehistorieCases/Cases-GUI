@@ -160,7 +160,7 @@ func _build_header() -> PanelContainer:
 	margin.add_child(row)
 
 	var brand := VBoxContainer.new()
-brand.custom_minimum_size = Vector2(140, 0)
+	brand.custom_minimum_size = Vector2(140, 0)
 	brand.add_theme_constant_override("separation", 0)
 	brand.add_child(_make_label("CASES", 20, COLOR_GOLD, true))
 	brand.add_child(_make_label("PARIS · 1919", 11, COLOR_MUTED, true))
@@ -296,7 +296,7 @@ func _build_conversation() -> PanelContainer:
 	top.add_theme_constant_override("separation", 10)
 	column.add_child(top)
 	var title_block := VBoxContainer.new()
-title_block.custom_minimum_size = Vector2(300, 0)
+	title_block.custom_minimum_size = Vector2(300, 0)
 	title_block.add_theme_constant_override("separation", 1)
 	title_block.add_child(_make_label("FORHANDLING", 14, COLOR_GOLD, true))
 	title_block.add_child(_make_label("Dine indlæg og CASES-simuleringens svar", 12, COLOR_MUTED))
