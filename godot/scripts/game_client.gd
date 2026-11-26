@@ -2115,8 +2115,11 @@ func _update_issue_board() -> void:
 		heading.add_theme_constant_override("separation", 5)
 		column.add_child(heading)
 		var title := _make_label(str(issue.get("title", "Forhandlingspunkt")), 12, COLOR_TEXT, true)
+		title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		heading.add_child(title)
 		var badge := _make_label(status_text, 9, status_color, true)
+		badge.custom_minimum_size = Vector2(116, 0)
+		badge.autowrap_mode = TextServer.AUTOWRAP_OFF
 		badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		badge.size_flags_horizontal = Control.SIZE_SHRINK_END
 		heading.add_child(badge)
