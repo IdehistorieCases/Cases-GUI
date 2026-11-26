@@ -196,7 +196,7 @@ func _build_interface() -> void:
 	canvas.add_child(screen)
 
 	var scrim := ColorRect.new()
-	scrim.color = Color(0.025, 0.035, 0.043, 0.18)
+	scrim.color = Color(0.025, 0.035, 0.043, 0.03)
 	scrim.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	scrim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	screen.add_child(scrim)
@@ -302,21 +302,21 @@ func _build_sidebar() -> PanelContainer:
 	column.add_theme_constant_override("separation", 9)
 	scroll.add_child(column)
 
-	column.add_child(_make_label("AKTIV SAG", 11, COLOR_GOLD, true))
-	_scenario_title_label = _make_label("Parisfredskonferencen", 18, COLOR_TEXT, true)
+	column.add_child(_make_label("SCENARIET", 11, COLOR_GOLD, true))
+	_scenario_title_label = _make_label("Fredskonferencen i Paris", 18, COLOR_TEXT, true)
 	column.add_child(_scenario_title_label)
 	_scenario_summary_label = _make_label(
-		"Henter scenariet fra CASES-backend …",
+		"Henter oplæg …",
 		12,
 		COLOR_MUTED
 	)
 	column.add_child(_scenario_summary_label)
 	column.add_child(_make_separator())
-	column.add_child(_make_label("DIN DELEGATION", 11, COLOR_GOLD, true))
+	column.add_child(_make_label("DIN ROLLE", 11, COLOR_GOLD, true))
 	_role_title_label = _make_label("Britisk rådgiver", 15, COLOR_TEXT, true)
 	column.add_child(_role_title_label)
 	_role_intro_label = _make_label(
-		"Rådgiv den britiske delegation. Samtalerne er simulerede.",
+		"Du rådgiver Storbritannien ved fredsforhandlingerne.",
 		12,
 		COLOR_MUTED
 	)
@@ -333,9 +333,9 @@ func _build_sidebar() -> PanelContainer:
 	var briefing_column := VBoxContainer.new()
 	briefing_column.add_theme_constant_override("separation", 5)
 	briefing_margin.add_child(briefing_column)
-	briefing_column.add_child(_make_label("FORHANDLINGENS FOKUS", 10, COLOR_GOLD, true))
+	briefing_column.add_child(_make_label("DIT MÅL", 10, COLOR_GOLD, true))
 	_briefing_tension_label = _make_label(
-		"Start forhandlingen for at se situationen.",
+		"Dit mål vises, når forhandlingen starter.",
 		14,
 		COLOR_TEXT,
 		true
@@ -366,15 +366,15 @@ func _build_sidebar() -> PanelContainer:
 	actions.name = "NegotiationActions"
 	actions.add_theme_constant_override("separation", 6)
 	sidebar_layout.add_child(actions)
-	_session_id_label = _make_label("Ingen aktiv forhandling", 11, COLOR_MUTED)
+	_session_id_label = _make_label("Ingen forhandling endnu", 11, COLOR_MUTED)
 	actions.add_child(_session_id_label)
 
-	_new_session_button = _make_button("Start ny forhandling", true)
+	_new_session_button = _make_button("Start forhandling", true)
 	_new_session_button.custom_minimum_size = Vector2(0, 42)
 	_new_session_button.pressed.connect(_start_new_session)
 	actions.add_child(_new_session_button)
 
-	_resume_button = _make_button("Genoptag gemt forhandling", false)
+	_resume_button = _make_button("Fortsæt gemt spil", false)
 	_resume_button.custom_minimum_size = Vector2(0, 38)
 	_resume_button.pressed.connect(_resume_saved_session)
 	actions.add_child(_resume_button)
@@ -391,7 +391,7 @@ func _build_sidebar() -> PanelContainer:
 	_retry_turn_button.pressed.connect(_retry_turn)
 	actions.add_child(_retry_turn_button)
 
-	_connection_toggle_button = _make_button("Vis teknisk status", false)
+	_connection_toggle_button = _make_button("Forbindelse", false)
 	_connection_toggle_button.custom_minimum_size = Vector2(0, 34)
 	_connection_toggle_button.pressed.connect(_toggle_connection_details)
 	actions.add_child(_make_separator())
@@ -424,7 +424,7 @@ func _build_conversation() -> PanelContainer:
 	title_block.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title_block.add_theme_constant_override("separation", 1)
 	title_block.add_child(_make_label("FORHANDLING", 14, COLOR_GOLD, true))
-	title_block.add_child(_make_label("Fremsæt et forslag, og se hvordan de andre delegationer reagerer.", 12, COLOR_MUTED))
+	title_block.add_child(_make_label("Skriv et forslag. De andre delegationer svarer.", 12, COLOR_MUTED))
 	top.add_child(title_block)
 
 	var status_block := VBoxContainer.new()
@@ -433,10 +433,10 @@ func _build_conversation() -> PanelContainer:
 	status_block.add_theme_constant_override("separation", 2)
 	status_block.alignment = BoxContainer.ALIGNMENT_END
 	top.add_child(status_block)
-	_turn_status_label = _make_label("INGEN AKTIV RUNDE", 12, COLOR_GOLD, true)
+	_turn_status_label = _make_label("KLAR TIL START", 12, COLOR_GOLD, true)
 	_turn_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	status_block.add_child(_turn_status_label)
-	_simulation_badge = _make_label("SIMULERING", 10, COLOR_AMBER, true)
+	_simulation_badge = _make_label("FIKTIV FORHANDLING", 10, COLOR_AMBER, true)
 	_simulation_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	status_block.add_child(_simulation_badge)
 
@@ -456,13 +456,13 @@ func _build_conversation() -> PanelContainer:
 	_transcript_column.add_theme_constant_override("separation", 9)
 	transcript_scroll.add_child(_transcript_column)
 	_add_message(
-		"VELKOMMEN",
-		"Vælg “Start ny forhandling” for at hente situationen og begynde første runde.",
+		"KLAR TIL FORHANDLING",
+		"Start forhandlingen for at læse oplægget.",
 		"system"
 	)
 
 	_next_prompt_label = _make_label(
-		"Din næste handling bliver gemt og føjet til forhandlingen.",
+		"Dit forslag og delegationernes svar vises her.",
 		12,
 		COLOR_MUTED
 	)
@@ -479,7 +479,7 @@ func _build_conversation() -> PanelContainer:
 	_composer.name = "ProposalComposer"
 	_composer.custom_minimum_size = Vector2(0, 82)
 	_composer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_composer.placeholder_text = "Skriv dit forslag, din indsigelse eller dit spørgsmål …"
+	_composer.placeholder_text = "Skriv dit forslag …"
 	_composer.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
 	_composer.add_theme_color_override("font_color", COLOR_TEXT)
 	_composer.add_theme_color_override("font_placeholder_color", COLOR_MUTED)
@@ -495,12 +495,12 @@ func _build_conversation() -> PanelContainer:
 
 	_send_button = _make_button("Send forslag", true)
 	_send_button.name = "SendProposalButton"
-	_send_button.tooltip_text = "Send dit forslag til den aktive forhandling."
+	_send_button.tooltip_text = "Send forslaget til de andre delegationer."
 	_send_button.custom_minimum_size = Vector2(136, 82)
 	_send_button.pressed.connect(_submit_turn)
 	_composer_row.add_child(_send_button)
 
-	_complete_button = _make_button("Afslut forløb", false)
+	_complete_button = _make_button("Afslut forhandling", false)
 	_complete_button.name = "CompleteSessionButton"
 	_complete_button.tooltip_text = "Afslut forhandlingen og gå til refleksionen."
 	_complete_button.custom_minimum_size = Vector2(132, 82)
@@ -521,7 +521,7 @@ func _build_conversation() -> PanelContainer:
 	var results_column := VBoxContainer.new()
 	results_column.add_theme_constant_override("separation", 6)
 	results_margin.add_child(results_column)
-	_results_status_label = _make_label("Afsluttende resultat", 12, COLOR_GOLD, true)
+	_results_status_label = _make_label("REFLEKSION", 12, COLOR_GOLD, true)
 	_results_status_label.name = "ReflectionStatus"
 	results_column.add_child(_results_status_label)
 	_results_scroll = ScrollContainer.new()
@@ -535,7 +535,7 @@ func _build_conversation() -> PanelContainer:
 	_results_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_results_content.add_theme_constant_override("separation", 8)
 	_results_scroll.add_child(_results_content)
-	_retry_reflection_button = _make_button("Prøv refleksionen igen", false)
+	_retry_reflection_button = _make_button("Hent refleksion igen", false)
 	_retry_reflection_button.name = "RetryReflectionButton"
 	_retry_reflection_button.custom_minimum_size = Vector2(0, 34)
 	_retry_reflection_button.visible = false
@@ -570,7 +570,7 @@ func _make_separator() -> HSeparator:
 func _make_panel(background: Color, border: Color) -> PanelContainer:
 	var panel := PanelContainer.new()
 	var hud_background := background
-	hud_background.a = minf(hud_background.a, 0.82)
+	hud_background.a = minf(hud_background.a, 0.62)
 	panel.add_theme_stylebox_override("panel", _make_style(hud_background, border, 12))
 	return panel
 
@@ -709,16 +709,21 @@ func _is_safe_endpoint(value: String) -> bool:
 
 func _update_scenario_labels() -> void:
 	var metadata: Dictionary = _scenario.get("metadata", {})
-	var full_title := str(metadata.get("title", "Parisfredskonferencen")).strip_edges()
-	var title_separator := full_title.find(":")
-	_scenario_title_label.text = (
-		full_title.substr(0, title_separator).strip_edges()
-		if title_separator >= 0
-		else full_title
-	)
-	_scenario_title_label.tooltip_text = full_title
-	_scenario_summary_label.text = str(
-		metadata.get("summary", "Forhandlinger ved fredskonferencen i Paris i 1919.")
+	var full_title := str(metadata.get("title", "Fredskonferencen i Paris")).strip_edges()
+	var is_versailles := SCENARIO_SLUG == "versailles-1919"
+	var display_title := full_title
+	if is_versailles:
+		display_title = "Fredskonferencen i Paris"
+	else:
+		var title_separator := full_title.find(":")
+		if title_separator >= 0:
+			display_title = full_title.substr(0, title_separator).strip_edges()
+	_scenario_title_label.text = display_title
+	_scenario_title_label.tooltip_text = "Paris, 1919" if is_versailles else full_title
+	_scenario_summary_label.text = (
+		"Paris, 1919. Forhandl om, hvordan freden skal se ud efter krigen."
+		if is_versailles
+		else str(metadata.get("summary", "Samtalerne tager udgangspunkt i fredsforhandlingerne i Paris."))
 	)
 	_player_role = {}
 	var roles: Array = _scenario.get("roles", [])
@@ -727,17 +732,20 @@ func _update_scenario_labels() -> void:
 			_player_role = role
 			break
 	if not _player_role.is_empty():
-		_role_title_label.text = str(_player_role.get("title", "Britisk rådgiver"))
-		_role_intro_label.text = str(
-			_player_role.get(
-				"introduction",
-				"Du er rådgiver ved fredsforhandlingerne i Paris."
-			)
+		_role_title_label.text = (
+			"Britisk rådgiver"
+			if is_versailles
+			else str(_player_role.get("title", "Britisk rådgiver"))
+		)
+		_role_intro_label.text = (
+			"Du rådgiver Storbritannien ved fredsforhandlingerne."
+			if is_versailles
+			else str(_player_role.get("introduction", "Du rådgiver en delegation ved fredsforhandlingerne."))
 		)
 		_role_intro_label.add_theme_font_size_override("font_size", 12)
 	else:
-		_role_title_label.text = "Den faste britiske rolle mangler"
-		_role_intro_label.text = "Backend-scenariet indeholder ikke den forventede spillerrolle."
+		_role_title_label.text = "Den britiske rolle mangler"
+		_role_intro_label.text = "Tjek, at scenariet er hentet korrekt fra serveren."
 
 
 func _start_new_session() -> void:
@@ -1876,15 +1884,16 @@ func _scroll_transcript_to_end() -> void:
 
 func _update_briefing_labels() -> void:
 	if _opening.is_empty():
-		_briefing_tension_label.text = "Start forhandlingen for at se situationen."
+		_briefing_tension_label.text = "Dit mål vises, når forhandlingen starter."
 		_briefing_goal_label.text = ""
-		_simulation_badge.text = "SIMULATION"
+		_simulation_badge.text = "FIKTIV FORHANDLING"
 		return
 	var tension := str(_opening.get("immediate_tension", ""))
-	var goal := str(_opening.get("player_goal", ""))
+	var goal := str(_opening.get("player_goal", "")).strip_edges()
+	goal = goal.trim_prefix("Dit mål:").strip_edges()
 	_briefing_tension_label.text = tension if not tension.is_empty() else "Åbningen er klar."
-	_briefing_goal_label.text = "Dit mål: " + goal if not goal.is_empty() else ""
-	_simulation_badge.text = "SIMULERET · IKKE HISTORISK CITAT"
+	_briefing_goal_label.text = goal
+	_simulation_badge.text = "FIKTIV DIALOG"
 
 
 func _update_session_label() -> void:
@@ -1900,13 +1909,13 @@ func _update_session_label() -> void:
 
 	var record := _current_record()
 	if record.is_empty():
-		_session_id_label.text = "Ingen aktiv forhandling"
+		_session_id_label.text = "Ingen forhandling endnu"
 		return
 	var session_id := str(record.get("session_id", ""))
 	if session_id.is_empty():
-		_session_id_label.text = "Forhandling oprettes · kan genoptages"
+		_session_id_label.text = "Opretter forhandling …"
 	else:
-		_session_id_label.text = "Forhandling · tur %d" % _current_turn_number
+		_session_id_label.text = "Tur %d" % _current_turn_number
 
 
 func _update_controls() -> void:
@@ -1937,7 +1946,7 @@ func _update_controls() -> void:
 		var completion_pending := false
 		if pending_completion is Dictionary:
 			completion_pending = not (pending_completion as Dictionary).is_empty()
-		_complete_button.text = "Genforsøg afslutning" if completion_pending else "Afslut forløb"
+		_complete_button.text = "Prøv igen" if completion_pending else "Afslut forhandling"
 		_complete_button.disabled = (
 			_operation_in_progress
 			or not _backend_ready
@@ -1982,7 +1991,7 @@ func _toggle_connection_details() -> void:
 		return
 	_connection_details.visible = not _connection_details.visible
 	_connection_toggle_button.text = (
-		"Skjul teknisk status" if _connection_details.visible else "Vis teknisk status"
+		"Skjul forbindelse" if _connection_details.visible else "Forbindelse"
 	)
 
 
@@ -1990,19 +1999,19 @@ func _set_status(message: String, state: String) -> void:
 	if _header_status == null:
 		return
 	var color := COLOR_MUTED
-	var short_status := "STATUS · VENTER"
+	var short_status := "Venter"
 	match state:
 		"ok":
 			color = COLOR_GREEN
-			short_status = "STATUS · FORBUNDET"
-			_connect_button.text = "Kontrollér igen"
+			short_status = "Forbundet"
+			_connect_button.text = "Tjek forbindelsen"
 		"working":
 			color = COLOR_AMBER
-			short_status = "STATUS · ARBEJDER"
+			short_status = "Arbejder …"
 			_connect_button.text = "Forbind igen"
 		"error":
 			color = COLOR_RED
-			short_status = "STATUS · PROBLEM"
+			short_status = "Noget gik galt"
 			_connect_button.text = "Forbind igen"
 	_header_status.text = short_status
 	_header_status.tooltip_text = message

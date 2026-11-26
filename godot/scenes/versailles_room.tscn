@@ -234,7 +234,7 @@ background_mode = 1
 background_color = Color(0.11, 0.14, 0.18, 1)
 ambient_light_source = 2
 ambient_light_color = Color(0.79, 0.74, 0.63, 1)
-ambient_light_energy = 0.72
+ambient_light_energy = 1.2
 
 [node name="VersaillesRoom" type="Node3D" unique_id=1066995368]
 
@@ -658,14 +658,14 @@ participant_countries = PackedStringArray("United States", "France", "Italy", "C
 [node name="SoftWindowLight" type="DirectionalLight3D" parent="Lighting" unique_id=1880267215]
 transform = Transform3D(0.8571673, 0.30995762, -0.41132772, 0, 0.79863554, 0.601815, 0.5150381, -0.51585615, 0.6845643, 0, 0, 0)
 light_color = Color(1, 0.88, 0.7, 1)
-light_energy = 0.68
+light_energy = 1.2
 
 [node name="WarmChandelierLight" type="OmniLight3D" parent="Lighting" unique_id=365593685]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.48, 0)
 light_color = Color(1, 0.78, 0.48, 1)
-light_energy = 0.32
-omni_range = 7.5
-omni_attenuation = 1.6
+light_energy = 0.8
+omni_range = 9.0
+omni_attenuation = 1.4
 
 [node name="Anchors" type="Node3D" parent="." unique_id=1847559052]
 
