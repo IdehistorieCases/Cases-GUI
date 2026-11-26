@@ -1,8 +1,10 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/versailles_room.tscn" id="1_room"]
+[ext_resource type="Script" path="res://scripts/versailles_room_preview.gd" id="2_camera_script"]
 
 [node name="VersaillesRoomPreview" type="Node3D"]
+script = ExtResource("2_camera_script")
 
 [node name="VersaillesRoom" parent="." instance=ExtResource("1_room")]
 

@@ -78,6 +78,11 @@ func _rebuild_participants() -> void:
 		participant.add_to_group("room_participants")
 		add_child(participant)
 
+		var player_eye := Marker3D.new()
+		player_eye.name = "PlayerEye"
+		player_eye.position = Vector3(0.0, 1.58, 0.0)
+		participant.add_child(player_eye)
+
 		var chair := CHAIR_SCENE.instantiate() as Node3D
 		if chair == null:
 			push_error("NegotiationSeating: the chair scene root must be a Node3D")

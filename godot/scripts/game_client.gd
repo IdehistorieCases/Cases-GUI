@@ -9,7 +9,7 @@ const BRITISH_DELEGATE: PackedScene = preload("res://assets/characters/cases_sui
 const FRENCH_DELEGATE: PackedScene = preload("res://assets/characters/cases_suited_negotiator_senior_mediator.glb")
 const CHINESE_DELEGATE: PackedScene = preload("res://assets/characters/cases_suited_negotiator_scholarly_delegate.glb")
 const SCENARIO_SLUG := "versailles-1919"
-const PINNED_SCENARIO_VERSION := "3.1-ai"
+const PINNED_SCENARIO_VERSION := "3.1-negotiation-ai"
 const PLAYER_ROLE_ID := "british_adviser"
 const NARRATOR_ID := "gpt6_luna_high"
 const SESSION_STORE_PATH := "user://cases_sessions.json"
@@ -54,6 +54,7 @@ var _narrator_status_label: Label
 var _briefing_tension_label: Label
 var _briefing_goal_label: Label
 var _session_id_label: Label
+var _issue_board_container: VBoxContainer
 var _transcript_column: VBoxContainer
 var _next_prompt_label: Label
 var _composer: TextEdit
@@ -107,7 +108,7 @@ func _populate_delegates(room: Node3D, scenario: Dictionary) -> void:
 
 	var actors: Variant = scenario.get("actors", [])
 	if not actors is Array or actors.size() != 3:
-		push_warning("CASES: pinned 3.1-ai scenario must contain exactly three delegations.")
+		push_warning("CASES: pinned three-party scenario must contain exactly three delegations.")
 		return
 
 	var country_by_actor := {
@@ -137,19 +138,22 @@ func _populate_delegates(room: Node3D, scenario: Dictionary) -> void:
 			or not scene_by_actor.has(actor_id)
 			or seen_actor_ids.has(actor_id)
 		):
-			push_warning("CASES: invalid or repeated actor in pinned 3.1-ai roster: %s" % actor_id)
+			push_warning("CASES: invalid or repeated actor in pinned three-party roster: %s" % actor_id)
 			return
 		seen_actor_ids[actor_id] = true
 		countries.append(country_by_actor[actor_id])
 	if seen_actor_ids.size() != country_by_actor.size():
-		push_warning("CASES: pinned 3.1-ai roster must include Britain, France and China.")
+		push_warning("CASES: pinned three-party roster must include Britain, France and China.")
 		return
 
+	# Detach before rebuilding seats so the camera is not freed with its old marker.
+	room.call("set_player_seat_index", -1)
 	# Rebuild seating from the same ordered actor list used for the delegate models.
 	seating.set("participant_count", 0)
 	seating.set("participant_countries", countries)
 	seating.set("participant_count", actors.size())
 	_delegate_players.clear()
+	var player_seat_index := -1
 
 	for index in range(actors.size()):
 		var actor_data: Dictionary = actors[index]
@@ -159,30 +163,37 @@ func _populate_delegates(room: Node3D, scenario: Dictionary) -> void:
 		if seat == null:
 			push_warning("CASES: missing seat %s for %s." % [seat_name, actor_id])
 			continue
+		var is_player_seat := actor_id == "britain"
+		if is_player_seat:
+			player_seat_index = index
 		var chair := seat.get_node_or_null("Chair")
 		if chair != null:
-			chair.visible = false # The seated delegate asset includes its own chair.
+			chair.visible = is_player_seat # The player's empty chair remains visible.
 		var delegate_scene: PackedScene = scene_by_actor[actor_id]
 		var actor: Node3D = delegate_scene.instantiate() as Node3D
 		if actor == null:
 			continue
 		actor.name = "Delegate_" + actor_id
 		actor.position = Vector3.ZERO
+		actor.visible = not is_player_seat
 		seat.add_child(actor)
 		var animation_player := _find_animation_player(actor)
 		if animation_player != null and animation_player.has_animation("SeatedIdle"):
 			animation_player.play("SeatedIdle")
 			_delegate_players[actor_id] = animation_player
-		var nameplate := Label3D.new()
-		nameplate.name = "DelegateNameplate"
-		nameplate.text = label_by_actor[actor_id]
-		nameplate.position = Vector3(0.0, 2.05, 0.0)
-		nameplate.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-		nameplate.font_size = 24
-		nameplate.pixel_size = 0.006
-		nameplate.outline_size = 4
-		nameplate.modulate = Color(0.96, 0.88, 0.67, 1.0)
-		seat.add_child(nameplate)
+		if not is_player_seat:
+			var nameplate := Label3D.new()
+			nameplate.name = "DelegateNameplate"
+			nameplate.text = label_by_actor[actor_id]
+			nameplate.position = Vector3(0.0, 2.05, 0.0)
+			nameplate.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+			nameplate.font_size = 24
+			nameplate.pixel_size = 0.006
+			nameplate.outline_size = 4
+			nameplate.modulate = Color(0.96, 0.88, 0.67, 1.0)
+			seat.add_child(nameplate)
+
+	room.call("set_player_seat_index", player_seat_index)
 
 
 func _find_animation_player(node: Node) -> AnimationPlayer:
@@ -246,29 +257,38 @@ func _build_interface() -> void:
 	scrim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	screen.add_child(scrim)
 
-	var margins := MarginContainer.new()
-	margins.name = "HudSafeArea"
-	margins.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	margins.add_theme_constant_override("margin_left", 22)
-	margins.add_theme_constant_override("margin_top", 18)
-	margins.add_theme_constant_override("margin_right", 22)
-	margins.add_theme_constant_override("margin_bottom", 18)
-	screen.add_child(margins)
+	var header := _build_header()
+	header.anchor_left = 0.0
+	header.anchor_right = 1.0
+	header.anchor_top = 0.0
+	header.anchor_bottom = 0.0
+	header.offset_left = 22
+	header.offset_top = 18
+	header.offset_right = -22
+	header.offset_bottom = 80
+	screen.add_child(header)
 
-	var page := VBoxContainer.new()
-	page.name = "HudLayout"
-	page.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	page.add_theme_constant_override("separation", 12)
-	margins.add_child(page)
+	var sidebar := _build_sidebar()
+	sidebar.anchor_left = 0.0
+	sidebar.anchor_right = 0.0
+	sidebar.anchor_top = 0.0
+	sidebar.anchor_bottom = 1.0
+	sidebar.offset_left = 22
+	sidebar.offset_top = 92
+	sidebar.offset_right = 322
+	sidebar.offset_bottom = -18
+	screen.add_child(sidebar)
 
-	page.add_child(_build_header())
-	var content := HBoxContainer.new()
-	content.name = "HudContent"
-	content.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	content.add_theme_constant_override("separation", 12)
-	page.add_child(content)
-	content.add_child(_build_sidebar())
-	content.add_child(_build_conversation())
+	var conversation := _build_conversation()
+	conversation.anchor_left = 0.0
+	conversation.anchor_right = 1.0
+	conversation.anchor_top = 0.50
+	conversation.anchor_bottom = 1.0
+	conversation.offset_left = 340
+	conversation.offset_top = 0
+	conversation.offset_right = -22
+	conversation.offset_bottom = -18
+	screen.add_child(conversation)
 
 	_update_session_label()
 	_update_controls()
@@ -389,6 +409,20 @@ func _build_sidebar() -> PanelContainer:
 	_briefing_goal_label = _make_label("", 12, COLOR_MUTED)
 	briefing_column.add_child(_briefing_goal_label)
 	column.add_child(briefing_card)
+
+	column.add_child(_make_label("FORHANDLINGSPUNKTER", 10, COLOR_GOLD, true))
+	_issue_board_container = VBoxContainer.new()
+	_issue_board_container.name = "TreatyIssueBoard"
+	_issue_board_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_issue_board_container.add_theme_constant_override("separation", 6)
+	column.add_child(_issue_board_container)
+	column.add_child(
+		_make_label(
+			"Din rolle er rådgiver. Forslag er ikke bindende aftaler.",
+			10,
+			COLOR_AMBER
+		)
+	)
 
 	_connection_details = VBoxContainer.new()
 	_connection_details.name = "ConnectionDetails"
@@ -722,6 +756,7 @@ func _connect_backend() -> void:
 		return
 	_scenario_available = not _scenario.is_empty()
 	_update_scenario_labels()
+	_update_issue_board()
 	if _room != null:
 		_populate_delegates(_room, _scenario)
 
@@ -1622,6 +1657,7 @@ func _refresh_authoritative_state(
 		return false
 	_turns = turns_response.get("data", {}).get("turns", [])
 	_update_briefing_labels()
+	_update_issue_board()
 	_update_session_label()
 	_render_transcript()
 
@@ -1705,6 +1741,63 @@ func _render_transcript() -> void:
 		var outcome := str(turn.get("outcome_summary", ""))
 		if not outcome.is_empty():
 			_add_message("UDVIKLING", outcome, "system")
+
+		var assessment: Variant = turn.get("negotiation_assessment", {})
+		if assessment is Dictionary:
+			var consequence := str(assessment.get("consequence", "")).strip_edges()
+			var disagreement := str(assessment.get("remaining_disagreement", "")).strip_edges()
+			var status_text := "Konsekvens: %s" % consequence if not consequence.is_empty() else ""
+			if not disagreement.is_empty():
+				if not status_text.is_empty():
+					status_text += "\n\n"
+				status_text += "Uenighed tilbage: " + disagreement
+			if not status_text.is_empty():
+				_add_message("FORHANDLINGSSTATUS · TUR %02d" % int(turn.get("turn_number", 0)), status_text, "system")
+
+		var issue_updates: Variant = turn.get("issue_updates", [])
+		if issue_updates is Array:
+			for update_value in issue_updates:
+				if not update_value is Dictionary:
+					continue
+				var update: Dictionary = update_value
+				var issue_title := str(update.get("issue_id", "Forhandlingspunkt"))
+				for issue_definition in _scenario.get("negotiation_issues", []):
+					if issue_definition is Dictionary and str(issue_definition.get("id", "")) == str(update.get("issue_id", "")):
+						issue_title = str(issue_definition.get("title", issue_title))
+				var update_status := str(update.get("status", "proposed"))
+				var status_label := "Foreslået"
+				if update_status == "contested":
+					status_label = "Omstridt"
+				elif update_status == "agreed":
+					status_label = "Foreløbig enighed (ikke bindende)"
+				var update_lines := PackedStringArray()
+				update_lines.append(
+					"Rådgiverens forslag (ikke bindende): " + str(update.get("recommendation", ""))
+				)
+				var responses: Variant = update.get("responses", [])
+				if responses is Array:
+					for response_value in responses:
+						if not response_value is Dictionary:
+							continue
+						var response: Dictionary = response_value
+						var response_actor := str(response.get("actor_id", ""))
+						var response_name := "Frankrig" if response_actor == "france" else "Kina" if response_actor == "china" else _actor_display_name(response_actor)
+						var response_stance := str(response.get("stance", ""))
+						match response_stance:
+							"accept":
+								response_stance = "accepterer foreløbigt"
+							"counter":
+								response_stance = "fremsætter modforslag"
+							"reject":
+								response_stance = "afviser"
+							"defer":
+								response_stance = "afventer"
+						var response_text := "%s · %s" % [response_stance, str(response.get("position", ""))]
+						if not str(response.get("counteroffer", "")).is_empty():
+							response_text += " · Modforslag: " + str(response.get("counteroffer", ""))
+						update_lines.append(response_name + ": " + response_text)
+				update_lines.append("Status: " + status_label)
+				_add_message("PUNKT · " + issue_title, "\n".join(update_lines), "system")
 
 	if _session_completed:
 		_next_prompt_label.text = "Forhandlingen er afsluttet. Se resultatet og refleksionen nedenfor."
@@ -1963,6 +2056,124 @@ func _update_briefing_labels() -> void:
 	_briefing_tension_label.text = tension if not tension.is_empty() else "Åbningen er klar."
 	_briefing_goal_label.text = goal
 	_simulation_badge.text = "FIKTIV DIALOG"
+
+
+func _update_issue_board() -> void:
+	if _issue_board_container == null:
+		return
+	for child in _issue_board_container.get_children():
+		_issue_board_container.remove_child(child)
+		child.queue_free()
+
+	var session_state: Variant = _session_snapshot.get("state", {})
+	var issue_list: Variant = (
+		session_state.get("negotiation_issues", [])
+		if session_state is Dictionary
+		else []
+	)
+	if not issue_list is Array or issue_list.is_empty():
+		issue_list = _scenario.get("negotiation_issues", [])
+	if not issue_list is Array or issue_list.is_empty():
+		_issue_board_container.add_child(
+			_make_label("Forhandlingspunkterne vises, når scenariet er indlæst.", 11, COLOR_MUTED)
+		)
+		return
+
+	for issue_value in issue_list:
+		if not issue_value is Dictionary:
+			continue
+		var issue: Dictionary = issue_value
+		var status := str(issue.get("status", "open"))
+		var status_text := "ÅBEN"
+		var status_color := COLOR_MUTED
+		match status:
+			"proposed":
+				status_text = "FORESLÅET"
+				status_color = COLOR_AMBER
+			"contested":
+				status_text = "OMSTRIDT"
+				status_color = COLOR_RED
+			"agreed":
+				status_text = "FORELØBIG ENIGHED"
+				status_color = COLOR_GREEN
+
+		var card := _make_panel(
+			Color(0.055, 0.065, 0.065, 0.92),
+			status_color.darkened(0.28)
+		)
+		var margin := MarginContainer.new()
+		margin.add_theme_constant_override("margin_left", 9)
+		margin.add_theme_constant_override("margin_top", 7)
+		margin.add_theme_constant_override("margin_right", 9)
+		margin.add_theme_constant_override("margin_bottom", 7)
+		card.add_child(margin)
+		var column := VBoxContainer.new()
+		column.add_theme_constant_override("separation", 3)
+		margin.add_child(column)
+
+		var heading := HBoxContainer.new()
+		heading.add_theme_constant_override("separation", 5)
+		column.add_child(heading)
+		var title := _make_label(str(issue.get("title", "Forhandlingspunkt")), 12, COLOR_TEXT, true)
+		heading.add_child(title)
+		var badge := _make_label(status_text, 9, status_color, true)
+		badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		badge.size_flags_horizontal = Control.SIZE_SHRINK_END
+		heading.add_child(badge)
+
+		var recommendation := str(issue.get("current_recommendation", "")).strip_edges()
+		if recommendation.is_empty():
+			recommendation = str(issue.get("baseline_disagreement", issue.get("description", "")))
+		else:
+			recommendation = "Rådgiverens forslag: " + recommendation
+		column.add_child(_make_label(_clip_board_text(recommendation, 170), 10, COLOR_TEXT))
+
+		var responses: Variant = issue.get("responses", [])
+		if responses is Array:
+			for response_value in responses:
+				if not response_value is Dictionary:
+					continue
+				var response: Dictionary = response_value
+				var actor_id := str(response.get("actor_id", ""))
+				var actor_name := "Frankrig" if actor_id == "france" else "Kina" if actor_id == "china" else _actor_display_name(actor_id)
+				var stance := str(response.get("stance", "defer"))
+				var stance_label := "accepterer foreløbigt"
+				match stance:
+					"counter":
+						stance_label = "modforslag"
+					"reject":
+						stance_label = "afviser"
+					"defer":
+						stance_label = "afventer"
+				var response_text := str(response.get("position", "")).strip_edges()
+				if stance == "counter" and not str(response.get("counteroffer", "")).is_empty():
+					response_text += " · " + str(response.get("counteroffer", ""))
+				column.add_child(
+					_make_label(
+						_clip_board_text("%s %s: %s" % [actor_name, stance_label, response_text], 150),
+						10,
+					COLOR_MUTED
+					)
+				)
+
+		var consequence := str(issue.get("last_consequence", "")).strip_edges()
+		if not consequence.is_empty():
+			column.add_child(
+				_make_label("Følge: " + _clip_board_text(consequence, 110), 10, COLOR_MUTED)
+			)
+		var disagreement := str(issue.get("remaining_disagreement", "")).strip_edges()
+		if not disagreement.is_empty():
+			column.add_child(
+				_make_label("Uenighed: " + _clip_board_text(disagreement, 110), 10, COLOR_AMBER)
+			)
+		_issue_board_container.add_child(card)
+
+
+func _clip_board_text(value: String, limit: int) -> String:
+	var text_value := value.strip_edges()
+	if text_value.length() <= limit:
+		return text_value
+	return text_value.substr(0, limit - 1).strip_edges() + "…"
 
 
 func _update_session_label() -> void:
