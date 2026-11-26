@@ -9,6 +9,7 @@ const BRITISH_DELEGATE: PackedScene = preload("res://assets/characters/cases_sui
 const FRENCH_DELEGATE: PackedScene = preload("res://assets/characters/cases_suited_negotiator_senior_mediator.glb")
 const CHINESE_DELEGATE: PackedScene = preload("res://assets/characters/cases_suited_negotiator_scholarly_delegate.glb")
 const SCENARIO_SLUG := "versailles-1919"
+const PINNED_SCENARIO_VERSION := "3.1-ai"
 const PLAYER_ROLE_ID := "british_adviser"
 const NARRATOR_ID := "gpt6_luna_high"
 const SESSION_STORE_PATH := "user://cases_sessions.json"
@@ -26,6 +27,7 @@ const COLOR_RED := Color(0.87, 0.49, 0.44, 1.0)
 const COLOR_AMBER := Color(0.91, 0.72, 0.39, 1.0)
 
 var _api: Node
+var _room: Node3D
 var _store: Dictionary = {"sessions": [], "current_session_local_id": "", "base_url": ""}
 var _session_store_path := SESSION_STORE_PATH
 var _api_base_url := DEFAULT_BACKEND_URL
@@ -83,10 +85,9 @@ var _active_delegate_id := "france"
 
 
 func _ready() -> void:
-	var room: Node3D = ROOM_SCENE.instantiate() as Node3D
-	room.name = "VersaillesNegotiationRoom"
-	add_child(room)
-	_populate_delegates(room)
+	_room = ROOM_SCENE.instantiate() as Node3D
+	_room.name = "VersaillesNegotiationRoom"
+	add_child(_room)
 
 	_api = BACKEND_API_SCRIPT.new()
 	_api.name = "CasesBackendApi"
@@ -98,39 +99,83 @@ func _ready() -> void:
 	_connect_backend()
 
 
-func _populate_delegates(room: Node3D) -> void:
+func _populate_delegates(room: Node3D, scenario: Dictionary) -> void:
 	var seating := room.get_node_or_null("VersaillesRoom/Furniture/NegotiationSeating")
 	if seating == null:
 		push_warning("CASES: room seating was not found; delegates will not be shown.")
 		return
 
-	# The active Versailles scenario has three delegations: Britain, France and China.
-	var roster := [
-		{"id": "britain", "label": "Storbritannien", "scene": BRITISH_DELEGATE, "seat": 5},
-		{"id": "france", "label": "Frankrig", "scene": FRENCH_DELEGATE, "seat": 1},
-		{"id": "china", "label": "Kina", "scene": CHINESE_DELEGATE, "seat": 3},
-	]
-	for member in roster:
-		var seat_name := "Participant_%02d" % (int(member["seat"]) + 1)
+	var actors: Variant = scenario.get("actors", [])
+	if not actors is Array or actors.size() != 3:
+		push_warning("CASES: pinned 3.1-ai scenario must contain exactly three delegations.")
+		return
+
+	var country_by_actor := {
+		"britain": "United Kingdom",
+		"france": "France",
+		"china": "China",
+	}
+	var label_by_actor := {
+		"britain": "Storbritannien",
+		"france": "Frankrig",
+		"china": "Kina",
+	}
+	var scene_by_actor := {
+		"britain": BRITISH_DELEGATE,
+		"france": FRENCH_DELEGATE,
+		"china": CHINESE_DELEGATE,
+	}
+	var countries := PackedStringArray()
+	var seen_actor_ids: Dictionary = {}
+	for actor_data in actors:
+		if not actor_data is Dictionary:
+			push_warning("CASES: scenario contains an invalid actor entry.")
+			return
+		var actor_id := str(actor_data.get("id", ""))
+		if (
+			not country_by_actor.has(actor_id)
+			or not scene_by_actor.has(actor_id)
+			or seen_actor_ids.has(actor_id)
+		):
+			push_warning("CASES: invalid or repeated actor in pinned 3.1-ai roster: %s" % actor_id)
+			return
+		seen_actor_ids[actor_id] = true
+		countries.append(country_by_actor[actor_id])
+	if seen_actor_ids.size() != country_by_actor.size():
+		push_warning("CASES: pinned 3.1-ai roster must include Britain, France and China.")
+		return
+
+	# Rebuild seating from the same ordered actor list used for the delegate models.
+	seating.set("participant_count", 0)
+	seating.set("participant_countries", countries)
+	seating.set("participant_count", actors.size())
+	_delegate_players.clear()
+
+	for index in range(actors.size()):
+		var actor_data: Dictionary = actors[index]
+		var actor_id := str(actor_data.get("id", ""))
+		var seat_name := "Participant_%02d" % (index + 1)
 		var seat: Node3D = seating.get_node_or_null(seat_name) as Node3D
 		if seat == null:
+			push_warning("CASES: missing seat %s for %s." % [seat_name, actor_id])
 			continue
 		var chair := seat.get_node_or_null("Chair")
 		if chair != null:
-			chair.visible = false # Each seated negotiator asset includes its own chair.
-		var actor: Node3D = member["scene"].instantiate() as Node3D
+			chair.visible = false # The seated delegate asset includes its own chair.
+		var delegate_scene: PackedScene = scene_by_actor[actor_id]
+		var actor: Node3D = delegate_scene.instantiate() as Node3D
 		if actor == null:
 			continue
-		actor.name = "Delegate_" + str(member["id"])
+		actor.name = "Delegate_" + actor_id
 		actor.position = Vector3.ZERO
 		seat.add_child(actor)
 		var animation_player := _find_animation_player(actor)
 		if animation_player != null and animation_player.has_animation("SeatedIdle"):
 			animation_player.play("SeatedIdle")
-			_delegate_players[str(member["id"])] = animation_player
+			_delegate_players[actor_id] = animation_player
 		var nameplate := Label3D.new()
 		nameplate.name = "DelegateNameplate"
-		nameplate.text = str(member["label"])
+		nameplate.text = label_by_actor[actor_id]
 		nameplate.position = Vector3(0.0, 2.05, 0.0)
 		nameplate.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 		nameplate.font_size = 24
@@ -666,8 +711,19 @@ func _connect_backend() -> void:
 		return
 
 	_scenario = scenario_response.get("data", {})
+	if str(_scenario.get("version", "")) != PINNED_SCENARIO_VERSION:
+		_scenario_available = false
+		_set_status(
+			"Forkert scenarieversion: forventede %s, men backend har %s."
+			% [PINNED_SCENARIO_VERSION, str(_scenario.get("version", "ukendt"))],
+			"error"
+		)
+		_set_busy(false)
+		return
 	_scenario_available = not _scenario.is_empty()
 	_update_scenario_labels()
+	if _room != null:
+		_populate_delegates(_room, _scenario)
 
 	var narrators: Dictionary = await _api.call("get_json", "/api/v1/narrators", "")
 	_narrator_ready = false
@@ -814,6 +870,7 @@ func _resume_saved_session() -> void:
 func _create_session(record: Dictionary) -> bool:
 	var payload := {
 		"scenario": SCENARIO_SLUG,
+		"scenario_version": PINNED_SCENARIO_VERSION,
 		"role_id": PLAYER_ROLE_ID,
 		"narrator": NARRATOR_ID,
 	}
@@ -872,6 +929,18 @@ func _restore_session(record: Dictionary) -> void:
 		_update_controls()
 		return
 	_session_snapshot = session_response.get("data", {})
+	if (
+		str(_session_snapshot.get("scenario", "")) != SCENARIO_SLUG
+		or str(_session_snapshot.get("scenario_version", "")) != PINNED_SCENARIO_VERSION
+	):
+		_set_status(
+			"Den gemte session tilhører en anden scenarieversion end %s."
+			% PINNED_SCENARIO_VERSION,
+			"error"
+		)
+		_operation_in_progress = false
+		_update_controls()
+		return
 	_current_turn_number = int(_session_snapshot.get("turn_number", 0))
 	var cached_reflection: Variant = record.get("reflection", {})
 	_reflection_result = cached_reflection if cached_reflection is Dictionary else {}
