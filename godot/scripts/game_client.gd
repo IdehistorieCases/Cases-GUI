@@ -13,6 +13,7 @@ const PLAYER_ROLE_ID := "british_adviser"
 const NARRATOR_ID := "gpt6_luna_high"
 const SESSION_STORE_PATH := "user://cases_sessions.json"
 const DEFAULT_BACKEND_URL := "http://127.0.0.1:18082"
+const DEFAULT_WEB_BACKEND_URL := "https://marcus-computer.taile97c31.ts.net"
 const INITIALIZATION_POLL_LIMIT := 180
 const TURN_POLL_LIMIT := 360
 const REFLECTION_REQUEST_TIMEOUT_SECONDS := 300.0
@@ -166,7 +167,8 @@ func _load_store() -> void:
 		_api_base_url = environment_url.trim_suffix("/")
 	else:
 		var saved_url := str(_store.get("base_url", "")).strip_edges()
-		_api_base_url = saved_url.trim_suffix("/") if not saved_url.is_empty() else DEFAULT_BACKEND_URL
+		var default_url := DEFAULT_WEB_BACKEND_URL if OS.has_feature("web") else DEFAULT_BACKEND_URL
+		_api_base_url = saved_url.trim_suffix("/") if not saved_url.is_empty() else default_url
 
 
 func _save_store() -> void:
