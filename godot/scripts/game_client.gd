@@ -1766,14 +1766,19 @@ func _render_transcript() -> void:
 						issue_title = str(issue_definition.get("title", issue_title))
 				var update_status := str(update.get("status", "proposed"))
 				var status_label := "Foreslået"
-				if update_status == "contested":
+				if update_status == "open":
+					status_label = "Åben"
+				elif update_status == "contested":
 					status_label = "Omstridt"
 				elif update_status == "agreed":
 					status_label = "Foreløbig enighed (ikke bindende)"
 				var update_lines := PackedStringArray()
-				update_lines.append(
-					"Rådgiverens forslag (ikke bindende): " + str(update.get("recommendation", ""))
+				var update_prefix := (
+					"Drøftelse (intet nyt vilkår): "
+					if str(update.get("action_type", "proposal")) == "discussion"
+					else "Rådgiverens forslag (ikke bindende): "
 				)
+				update_lines.append(update_prefix + str(update.get("recommendation", "")))
 				var responses: Variant = update.get("responses", [])
 				if responses is Array:
 					for response_value in responses:
@@ -2125,10 +2130,12 @@ func _update_issue_board() -> void:
 		heading.add_child(badge)
 
 		var recommendation := str(issue.get("current_recommendation", "")).strip_edges()
+		var action_type := str(issue.get("last_action_type", "none"))
 		if recommendation.is_empty():
 			recommendation = str(issue.get("baseline_disagreement", issue.get("description", "")))
 		else:
-			recommendation = "Rådgiverens forslag: " + recommendation
+			var update_prefix := "Drøftelse: " if action_type == "discussion" else "Rådgiverens forslag: "
+			recommendation = update_prefix + recommendation
 		column.add_child(_make_label(_clip_board_text(recommendation, 170), 10, COLOR_TEXT))
 
 		var responses: Variant = issue.get("responses", [])
