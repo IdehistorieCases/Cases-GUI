@@ -142,7 +142,7 @@ func _run() -> void:
 	)
 	_expect(
 		complete_button != null
-			and complete_button.text == "Genforsøg afslutning"
+			and complete_button.text == "Prøv igen"
 			and not complete_button.disabled,
 		"Temporary completion failure leaves a completion retry available"
 	)
@@ -200,6 +200,77 @@ func _run() -> void:
 			and not composer_row.visible,
 		"Successful completion clears the pending request and opens the cached result view"
 	)
+	var completed_reflection_labels := _collect_label_texts(results_panel)
+	_expect(
+		not completed_reflection_labels.has("<null>"),
+		"Nullable historical reflection fields are never rendered as the null token"
+	)
+	_expect(
+		completed_reflection_labels.has("Der var ikke godkendt historisk belæg til en sammenligning."),
+		"A null historical abstention uses the evidence-status explanation"
+	)
+	_expect(
+		completed_reflection_labels.has("En kvalitativ refleksion."),
+		"A ready reflection still displays its summary"
+	)
+
+	record["reflection"] = {}
+	client.set("_reflection_result", {})
+	client.set("_reflection_error", "")
+	client.set("_reflection_retry_pending", false)
+	fake_api.next_response = {
+		"ok": true,
+		"status": 200,
+		"data": {"status": "ready", "summary": null},
+	}
+	await client.call("_request_reflection")
+	var null_summary_labels := _collect_label_texts(results_panel)
+	_expect(
+		record.get("reflection", {}).is_empty(),
+		"A reflection without a string summary is not cached as ready"
+	)
+	_expect(
+		retry_reflection_button.visible and not retry_reflection_button.disabled,
+		"A missing reflection summary leaves a retry action available"
+	)
+	_expect(
+		not null_summary_labels.has("<null>"),
+		"A missing reflection summary is never rendered as the null token"
+	)
+
+	record["reflection"] = {"status": "ready", "summary": "<null>"}
+	client.set("_reflection_result", record["reflection"])
+	client.set("_reflection_error", "")
+	var reflection_request_count := fake_api.post_requests.size()
+	fake_api.next_response = {
+		"ok": true,
+		"status": 200,
+		"data": {
+			"status": "ready",
+			"completion": {},
+			"summary": "Nyt resumé efter genhentning.",
+			"player_choices": [],
+			"simulated_consequences": [],
+			"player_claims": [],
+			"documented_history": [],
+			"unsupported_historical_claim_count": 0,
+			"objectives": [],
+			"unknown_objective_observation_count": 0,
+			"evidence_status": "evidence_unavailable",
+			"historical_comparison": null,
+			"historical_abstention": null,
+			"historical_evidence_ids": [],
+			"sources": [],
+			"uncertainty_notes": ["Ingen godkendte historiske passager."],
+			"provenance": {},
+		},
+	}
+	await client.call("_request_reflection")
+	_expect(
+		fake_api.post_requests.size() == reflection_request_count + 1
+			and str(record.get("reflection", {}).get("summary", "")) == "Nyt resumé efter genhentning.",
+		"A cached null-token summary is discarded and fetched again"
+	)
 
 	var long_message := "En lang besked " + "ord ".repeat(80)
 	client.call("_add_message", "TEST", long_message, "system")
@@ -223,3 +294,12 @@ func _run() -> void:
 func _expect(condition: bool, message: String) -> void:
 	if not condition:
 		failures.append(message)
+
+
+func _collect_label_texts(node: Node) -> PackedStringArray:
+	var result := PackedStringArray()
+	if node is Label:
+		result.append((node as Label).text)
+	for child in node.get_children():
+		result.append_array(_collect_label_texts(child))
+	return result

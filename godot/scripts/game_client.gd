@@ -1545,13 +1545,26 @@ func _request_reflection() -> void:
 	if record.is_empty():
 		return
 	var saved_reflection: Variant = record.get("reflection", {})
-	if saved_reflection is Dictionary and str(saved_reflection.get("status", "")) == "ready":
+	var saved_summary := (
+		_reflection_text(saved_reflection.get("summary"))
+		if saved_reflection is Dictionary
+		else ""
+	)
+	if (
+		saved_reflection is Dictionary
+		and str(saved_reflection.get("status", "")) == "ready"
+		and not saved_summary.is_empty()
+	):
 		_reflection_retry_pending = false
 		_reflection_failed_permanently = false
 		_reflection_result = saved_reflection
 		_render_results()
 		_set_status("Den afsluttende refleksion er klar.", "ok")
 		return
+	if saved_reflection is Dictionary and str(saved_reflection.get("status", "")) == "ready":
+		record["reflection"] = {}
+		_reflection_result = {}
+		_save_store()
 
 	_reflection_loading = true
 	_reflection_error = ""
@@ -1588,10 +1601,15 @@ func _request_reflection() -> void:
 		return
 
 	var reflection_data: Variant = response.get("data", {})
+	var reflection_summary := (
+		_reflection_text(reflection_data.get("summary"))
+		if reflection_data is Dictionary
+		else ""
+	)
 	if (
 		not reflection_data is Dictionary
 		or str(reflection_data.get("status", "")) != "ready"
-		or str(reflection_data.get("summary", "")).strip_edges().is_empty()
+		or reflection_summary.is_empty()
 	):
 		_reflection_retry_pending = true
 		_reflection_failed_permanently = false
@@ -1619,6 +1637,15 @@ func _request_reflection() -> void:
 	_update_controls()
 	if is_inside_tree():
 		call_deferred("_scroll_results_to_end")
+
+
+func _reflection_text(value: Variant) -> String:
+	if not value is String:
+		return ""
+	var normalized_text := str(value).strip_edges()
+	if normalized_text.to_lower() in ["<null>", "null", "none", "undefined"]:
+		return ""
+	return normalized_text
 
 
 func _refresh_authoritative_state(
@@ -1876,7 +1903,11 @@ func _render_results() -> void:
 	var record := _current_record()
 	var cached_reflection: Variant = record.get("reflection", {})
 	var reflection := _reflection_result
-	if cached_reflection is Dictionary and str(cached_reflection.get("status", "")) == "ready":
+	if (
+		cached_reflection is Dictionary
+		and str(cached_reflection.get("status", "")) == "ready"
+		and not _reflection_text(cached_reflection.get("summary")).is_empty()
+	):
 		reflection = cached_reflection
 		_reflection_result = cached_reflection
 	var is_ready := str(reflection.get("status", "")) == "ready"
@@ -1910,8 +1941,8 @@ func _render_results() -> void:
 	if not _turns.is_empty():
 		var final_turn: Variant = _turns[_turns.size() - 1]
 		if final_turn is Dictionary:
-			var final_reply := str(final_turn.get("reply", "")).strip_edges()
-			var final_summary := str(final_turn.get("outcome_summary", "")).strip_edges()
+			var final_reply := _reflection_text(final_turn.get("reply"))
+			var final_summary := _reflection_text(final_turn.get("outcome_summary"))
 			var ending_lines := PackedStringArray()
 			if not final_reply.is_empty():
 				ending_lines.append(final_reply)
@@ -1932,9 +1963,14 @@ func _render_results() -> void:
 		_add_result_section("REFLEKSION", "Refleksionen vises her, når backend har færdiggjort den.")
 		return
 
-	var reflection_summary := str(reflection.get("summary", "")).strip_edges()
+	var reflection_summary := _reflection_text(reflection.get("summary"))
 	if not reflection_summary.is_empty():
 		_add_result_section("REFLEKSION", reflection_summary)
+	elif is_ready:
+		_add_result_section(
+			"REFLEKSION",
+			"Resuméet mangler i refleksionssvaret. Du kan hente refleksionen igen."
+		)
 
 	var choices: Variant = reflection.get("player_choices", [])
 	if choices is Array and not choices.is_empty():
@@ -1942,8 +1978,8 @@ func _render_results() -> void:
 		for choice in choices:
 			if not (choice is Dictionary):
 				continue
-			var action := str(choice.get("action", "")).strip_edges()
-			var choice_summary := str(choice.get("summary", "")).strip_edges()
+			var action := _reflection_text(choice.get("action"))
+			var choice_summary := _reflection_text(choice.get("summary"))
 			var choice_line := "Tur %d" % int(choice.get("turn_number", 0))
 			if not action.is_empty():
 				choice_line += " · " + action
@@ -1962,7 +1998,11 @@ func _render_results() -> void:
 			var details: Variant = consequence.get("details", {})
 			if not (details is Dictionary):
 				continue
-			var detail := str(details.get("summary", details.get("resolution", details.get("reason", "")))).strip_edges()
+			var detail := ""
+			for detail_key in ["summary", "resolution", "reason"]:
+				detail = _reflection_text(details.get(detail_key))
+				if not detail.is_empty():
+					break
 			if not detail.is_empty():
 				consequence_lines.append("Tur %d · %s" % [int(consequence.get("turn_number", 0)), detail])
 		if not consequence_lines.is_empty():
@@ -1974,15 +2014,19 @@ func _render_results() -> void:
 		for objective in objectives:
 			if not (objective is Dictionary):
 				continue
-			var objective_name := str(objective.get("title", objective.get("id", "Læringsmål")))
-			var feedback := str(objective.get("reflection", "")).strip_edges()
+			var objective_name := _reflection_text(objective.get("title"))
+			if objective_name.is_empty():
+				objective_name = _reflection_text(objective.get("id"))
+			if objective_name.is_empty():
+				objective_name = "Læringsmål"
+			var feedback := _reflection_text(objective.get("reflection"))
 			if not feedback.is_empty():
 				objective_lines.append("%s\n%s" % [objective_name, feedback])
 		if not objective_lines.is_empty():
 			_add_result_section("LÆRINGSMÅL", "\n\n".join(objective_lines))
 
 	var evidence_ids: Variant = reflection.get("historical_evidence_ids", [])
-	var comparison := str(reflection.get("historical_comparison", "")).strip_edges()
+	var comparison := _reflection_text(reflection.get("historical_comparison"))
 	if evidence_ids is Array and not evidence_ids.is_empty() and not comparison.is_empty():
 		_add_result_section("HISTORISK SAMMENLIGNING", comparison)
 		var source_titles := PackedStringArray()
@@ -1990,13 +2034,13 @@ func _render_results() -> void:
 		if sources is Array:
 			for source in sources:
 				if source is Dictionary:
-					var source_title := str(source.get("source_title", "")).strip_edges()
+					var source_title := _reflection_text(source.get("source_title"))
 					if not source_title.is_empty():
 						source_titles.append(source_title)
 		if not source_titles.is_empty():
 			_add_result_section("KILDER", "\n".join(source_titles))
 	else:
-		var abstention := str(reflection.get("historical_abstention", "")).strip_edges()
+		var abstention := _reflection_text(reflection.get("historical_abstention"))
 		if abstention.is_empty():
 			match str(reflection.get("evidence_status", "")):
 				"evidence_unavailable":
@@ -2011,7 +2055,7 @@ func _render_results() -> void:
 	if uncertainty_notes is Array and not uncertainty_notes.is_empty():
 		var notes := PackedStringArray()
 		for note in uncertainty_notes:
-			var note_text := str(note).strip_edges()
+			var note_text := _reflection_text(note)
 			if not note_text.is_empty():
 				notes.append("• " + note_text)
 		if not notes.is_empty():
